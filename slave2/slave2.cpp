@@ -20,8 +20,6 @@
 #define LED 13
 uint8_t status = 0;	 // status of program/slave
 
-volatile uint32_t z = 0;
-
 /**********************************************************/
 /*				  Battery monitoring					*/
 /**********************************************************/
@@ -35,14 +33,13 @@ volatile uint8_t vbatLV, vbatHV;
 
 T3SPI SPI; // create SPI object
 volatile uint8_t dataOut, dataIn; // SPI input/output bytes
-volatile uint8_t command;
+volatile uint8_t command = 255;
 
 // blink
 elapsedMillis ledElapsedTime;
 
 bool ledState = true;
 uint32_t ledBlinkTime = 500;
-elapsedMillis SPIRequestTime;
 
 /**********************************************************/
 /*						TSOPS						   */
@@ -75,54 +72,39 @@ uint8_t tsopData[TSOP_COUNT];
 inline void initBatReadings();
 inline void readBat();
 inline void initSPI();
+inline void ledBlink();
 void TSOP_ISR();
 
 int main(){
-	pinMode(33, INPUT);
-	// pinMode(25, OUTPUT);
+	noInterrupts();
+
+	CORE_PIN33_CONFIG = 0;  // completely disables the pin
+	
 	pinMode(13, OUTPUT);
-	// pinMode(32, OUTPUT);
-	// //pinMode(33, INPUT);
-	// digitalWrite(32, LOW);
-	// digitalWrite(25, LOW);
-	// digitalWrite(33, LOW);
-	// // while(true){
-	digitalWrite(13, HIGH);
-	// // 	digitalWrite(32, HIGH);
-	// // }
+
+	digitalWrite(13, LOW);
 	Serial.begin(115200); // nice number but it doesn't actually matter for the Teensy 3.x
+	digitalWrite(13, LOW);
 
 	tsops.begin();	 // initialise TSOPS
-	initBatReadings(); // initialise battery readings
 	tsops.angle = 999; // for debugging purposes, initially set angle as this
 
-	initSPI();		 // initialise SPI slave
+	digitalWrite(13, LOW);
+	initBatReadings(); // initialise battery readings
+	digitalWrite(13, LOW);
 
+	initSPI();		 // initialise SPI slave
+	digitalWrite(13, HIGH);
 	/* set TSOP ISR priority 0 to 255, 0 being the highest (127 default)
 	   we don't want the interrupt to interfer with SPI too much. However */
 	TSOP_ISR_Timer.priority(127);
-
+	digitalWrite(13, LOW);
 	// attach TSOP ISR
 	TSOP_ISR_Timer.begin(TSOP_ISR, ISR_INTERVAL);
-
+	digitalWrite(13, HIGH);
 	interrupts();	  // enable interrupts
 
 	while(1){	
-		// digitalWrite(13, LOW);
-		// delay(500);
-		// digitalWrite(13, HIGH);
-		// delay(500);
-		// Serial.print(tsops.indexes[0]);
-		// Serial.print('\t');
-		// Serial.print(tsops.angle);
-		// Serial.print('\t');
-		
-		// PRINTARRAY(tsops.filteredData);
-		// readBat();
-		// Serial.print(vbatLV);
-		// Serial.print('\t');
-		// Serial.println(vbatHV);	
-
 	}
 
 	return 0;		  // it'll never reach here
@@ -145,14 +127,6 @@ inline void readBat(){
 
 inline void ledBlink(){
 	// led blinking
-	if (SPIRequestTime > 100){
-		// no SPI requests for past 100ms!
-		// fast blink to show error
-		ledBlinkTime = 50;
-	}
-	else{
-		ledBlinkTime = 500;
-	}
 	if (ledElapsedTime > ledBlinkTime){
 		if (ledState){
 			digitalWriteFast(LED, HIGH);
@@ -177,54 +151,59 @@ inline void initSPI(){
 /* Interrupt Service Routine to handle incoming data
    For best performance, direct access to hardware SPI registers are used (instead of via lib) */
 void spi0_isr(){
-	noInterrupts();
-	SPIRequestTime = 0;
+	//noInterrupts();
+	//SPIRequestTime = millis();
 	command = SPI0_POPR;
 	switch(command){
-		case SLAVE2_COMMANDS::SLAVE2_CHECK_STATUS: SPI0_PUSHR_SLAVE = status;				 break;
-		case SLAVE2_COMMANDS::TSOP_DATA0:		   SPI0_PUSHR_SLAVE = tsopData[0];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA1:		   SPI0_PUSHR_SLAVE = tsopData[1];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA2:		   SPI0_PUSHR_SLAVE = tsopData[2];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA3:		   SPI0_PUSHR_SLAVE = tsopData[3];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA4:		   SPI0_PUSHR_SLAVE = tsopData[4];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA5:		   SPI0_PUSHR_SLAVE = tsopData[5];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA6:		   SPI0_PUSHR_SLAVE = tsopData[6];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA7:		   SPI0_PUSHR_SLAVE = tsopData[7];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA8:		   SPI0_PUSHR_SLAVE = tsopData[8];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA9:		   SPI0_PUSHR_SLAVE = tsopData[9];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA10:		   SPI0_PUSHR_SLAVE = tsopData[10];		     break;	 
-		case SLAVE2_COMMANDS::TSOP_DATA11:		   SPI0_PUSHR_SLAVE = tsopData[11];		     break;
-		case SLAVE2_COMMANDS::TSOP_DATA12:		   SPI0_PUSHR_SLAVE = tsopData[12];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA13:		   SPI0_PUSHR_SLAVE = tsopData[13];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA14:		   SPI0_PUSHR_SLAVE = tsopData[14];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA15:		   SPI0_PUSHR_SLAVE = tsopData[15];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA16:		   SPI0_PUSHR_SLAVE = tsopData[16];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA17:		   SPI0_PUSHR_SLAVE = tsopData[17];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA18:		   SPI0_PUSHR_SLAVE = tsopData[18];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA19:		   SPI0_PUSHR_SLAVE = tsopData[19];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA20:		   SPI0_PUSHR_SLAVE = tsopData[20];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA21:		   SPI0_PUSHR_SLAVE = tsopData[21];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA22:		   SPI0_PUSHR_SLAVE = tsopData[22];		     break; 
-		case SLAVE2_COMMANDS::TSOP_DATA23:		   SPI0_PUSHR_SLAVE = tsopData[23];		     break; 
-		case SLAVE2_COMMANDS::VBAT_REF_LV:		   SPI0_PUSHR_SLAVE = vbatLV;				 break;
-		case SLAVE2_COMMANDS::VBAT_REF_HV:		   SPI0_PUSHR_SLAVE = vbatHV;				 break;
-		case SLAVE2_COMMANDS::TSOP_ANGLE_HIGH:	   SPI0_PUSHR_SLAVE = highByte(tsops.angle); break;
-		case SLAVE2_COMMANDS::TSOP_ANGLE_LOW:	   SPI0_PUSHR_SLAVE = lowByte(tsops.angle);  break;
+		//case 255: command = c; SPI0_PUSHR_SLAVE = 0; break;
+		case 0: SPI0_PUSHR_SLAVE = 0; break;
+		// case SLAVE2_COMMANDS::SLAVE2_CHECK_STATUS: SPI0_PUSHR_SLAVE = status;				 break;
+		// case SLAVE2_COMMANDS::TSOP_DATA0:		   SPI0_PUSHR_SLAVE = tsopData[0];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA1:		   SPI0_PUSHR_SLAVE = tsopData[1];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA2:		   SPI0_PUSHR_SLAVE = tsopData[2];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA3:		   SPI0_PUSHR_SLAVE = tsopData[3];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA4:		   SPI0_PUSHR_SLAVE = tsopData[4];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA5:		   SPI0_PUSHR_SLAVE = tsopData[5];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA6:		   SPI0_PUSHR_SLAVE = tsopData[6];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA7:		   SPI0_PUSHR_SLAVE = tsopData[7];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA8:		   SPI0_PUSHR_SLAVE = tsopData[8];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA9:		   SPI0_PUSHR_SLAVE = tsopData[9];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA10:		   SPI0_PUSHR_SLAVE = tsopData[10];		     break;	 
+		// case SLAVE2_COMMANDS::TSOP_DATA11:		   SPI0_PUSHR_SLAVE = tsopData[11];		     break;
+		// case SLAVE2_COMMANDS::TSOP_DATA12:		   SPI0_PUSHR_SLAVE = tsopData[12];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA13:		   SPI0_PUSHR_SLAVE = tsopData[13];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA14:		   SPI0_PUSHR_SLAVE = tsopData[14];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA15:		   SPI0_PUSHR_SLAVE = tsopData[15];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA16:		   SPI0_PUSHR_SLAVE = tsopData[16];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA17:		   SPI0_PUSHR_SLAVE = tsopData[17];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA18:		   SPI0_PUSHR_SLAVE = tsopData[18];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA19:		   SPI0_PUSHR_SLAVE = tsopData[19];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA20:		   SPI0_PUSHR_SLAVE = tsopData[20];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA21:		   SPI0_PUSHR_SLAVE = tsopData[21];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA22:		   SPI0_PUSHR_SLAVE = tsopData[22];		     break; 
+		// case SLAVE2_COMMANDS::TSOP_DATA23:		   SPI0_PUSHR_SLAVE = tsopData[23];		     break; 
+		// case SLAVE2_COMMANDS::VBAT_REF_LV:		   SPI0_PUSHR_SLAVE = vbatLV;				 break;
+		// case SLAVE2_COMMANDS::VBAT_REF_HV:		   SPI0_PUSHR_SLAVE = vbatHV;				 break;
+		// case SLAVE2_COMMANDS::TSOP_ANGLE_HIGH:	   SPI0_PUSHR_SLAVE = highByte(tsops.angle); break;
+		// case SLAVE2_COMMANDS::TSOP_ANGLE_LOW:	   SPI0_PUSHR_SLAVE = lowByte(tsops.angle);  break;
 		case SLAVE2_COMMANDS::TSOP_ANGLE_BYTE:	   SPI0_PUSHR_SLAVE = tsops.angleByte;		 	 break;
 		case SLAVE2_COMMANDS::TSOP_STRENGTH:	   SPI0_PUSHR_SLAVE = tsops.averageStrength; 	 break;
-		default:   SPI0_PUSHR_SLAVE = 254;		break;
+		default:  SPI0_PUSHR_SLAVE = 0;	break;
 	}
-
+	ledBlinkTime = 500;
 	SPI0_SR |= SPI_SR_RFDF;
-	interrupts();
+	//Serial.println(command); //interrupts();
 }
 
 // Routine to read tsops (as well as batteries)
 void TSOP_ISR(){
-	SPIRequestTime = 0;
 	TSOP_ISR_Count++;	
 	if (tsopsOn){
 		tsops.read();
+	}
+	else{
+		ledBlinkTime = 50;
+		Serial.println(tsops.angle);
 	}
 	// else, we're in a stage where we're unlocking the tsops.
 
@@ -241,33 +220,9 @@ void TSOP_ISR(){
 
 			tsops.filterData();
 			tsops.getStrength();
-			tsops.getAngle(5);
+			tsops.getAngle();
 
-			Serial.print(tsops.angle);
-			Serial.print('\t');
-			PRINTARRAY(tsops.indexes);
-			// Serial.print(tsops.averageStrength);
-			// Serial.println();
 		}
-		//PRINTARRAY(tsops.strengths);
-
-		// Serial.print('\t');
-		// PRINTARRAY(tsops.data);
-		
-		//tsops.angle = tsops.indexes[0] * 360/24;
-		// Serial.println("start");
-		// PRINTARRAY(tsops.data);
-		// PRINTARRAY(tsops.filteredData);
-		// Serial.println(tsops.indexes[0]);
-		// PRINTARRAY(tsops.filteredDataSorted);
-		
-		// Serial.print(tsops.x); Serial.print('\t'); Serial.println(tsops.y);
-		//Serial.println(tsops.angle);
-		// Serial.println("end");
-		// PRINTARRAY(tsops.scaledSin);
-		// PRINTARRAY(tsops.scaledCos);
-
-
 		// unlock tsops and read batteries. Must be a multiple of RESOLUTION!
 		if (TSOP_ISR_Count == TSOP_RESOLUTION * 50){
 			// 25500 * 25us = 0.6375s
