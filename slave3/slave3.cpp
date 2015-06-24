@@ -70,6 +70,7 @@ T3SPI SPI;
 volatile uint8_t dataExpected = 0;
 volatile uint8_t command;
 volatile uint32_t spi0_isr_count = 0;
+volatile uint8_t spiBuff[5] = {0};
 
 /**MOTORS********************************************************/
 #define MAX_RPM		12400 // theoretical max rpm of Maxon motor according to datasheet
@@ -348,57 +349,57 @@ void spi0_isr(){
 	SPIRequestTime = 0;
 	if (dataExpected == 0){
 		command = SPI0_POPR;
-		csA = 111;
-		// Serial.println(command);
+		CLEARARRAY(spiBuff);
+
 		switch(command){
-			case SLAVE3_COMMANDS::SLAVE3_CHECK_STATUS: SPI0_PUSHR_SLAVE = status;        dataExpected = 0;  break;
-			case SLAVE3_COMMANDS::MOVE1:			   SPI0_PUSHR_SLAVE = csA;	         dataExpected = 1;  break;
-			case SLAVE3_COMMANDS::MOVE2:			   SPI0_PUSHR_SLAVE = csB;	         dataExpected = 1;  break;
-			case SLAVE3_COMMANDS::MOVE3:			   SPI0_PUSHR_SLAVE = csC;	         dataExpected = 1;  break;
-			case SLAVE3_COMMANDS::MOVE4:			   SPI0_PUSHR_SLAVE = csD;	         dataExpected = 1;  break;  
-			case SLAVE3_COMMANDS::MOVE5:			   SPI0_PUSHR_SLAVE = csE;	         dataExpected = 1;  break;  
-			case SLAVE3_COMMANDS::CSENSE1:			   SPI0_PUSHR_SLAVE = csA;	         dataExpected = 0;  break;
-			case SLAVE3_COMMANDS::CSENSE2:			   SPI0_PUSHR_SLAVE = csB;	         dataExpected = 0;  break;
-			case SLAVE3_COMMANDS::CSENSE3:			   SPI0_PUSHR_SLAVE = csC;	         dataExpected = 0;  break;
-			case SLAVE3_COMMANDS::CSENSE4:			   SPI0_PUSHR_SLAVE = csD;	         dataExpected = 0;  break;
-			case SLAVE3_COMMANDS::CSENSE5:			   SPI0_PUSHR_SLAVE = csE;	         dataExpected = 0;  break;
+			case SLAVE3_COMMANDS::SLAVE3_CHECK_STATUS: SPI0_PUSHR_SLAVE = status;            dataExpected = 0;  break;
+			case SLAVE3_COMMANDS::MOVE1:			   SPI0_PUSHR_SLAVE = csA;	             dataExpected = 1;  break;
+			case SLAVE3_COMMANDS::MOVE2:			   SPI0_PUSHR_SLAVE = csB;	             dataExpected = 1;  break;
+			case SLAVE3_COMMANDS::MOVE3:			   SPI0_PUSHR_SLAVE = csC;	             dataExpected = 1;  break;
+			case SLAVE3_COMMANDS::MOVE4:			   SPI0_PUSHR_SLAVE = csD;	             dataExpected = 1;  break;  
+			case SLAVE3_COMMANDS::MOVE5:			   SPI0_PUSHR_SLAVE = csE;	             dataExpected = 1;  break;  
+			case SLAVE3_COMMANDS::CSENSE1:			   SPI0_PUSHR_SLAVE = csA;	             dataExpected = 0;  break;
+			case SLAVE3_COMMANDS::CSENSE2:			   SPI0_PUSHR_SLAVE = csB;	             dataExpected = 0;  break;
+			case SLAVE3_COMMANDS::CSENSE3:			   SPI0_PUSHR_SLAVE = csC;	             dataExpected = 0;  break;
+			case SLAVE3_COMMANDS::CSENSE4:			   SPI0_PUSHR_SLAVE = csD;	             dataExpected = 0;  break;
+			case SLAVE3_COMMANDS::CSENSE5:			   SPI0_PUSHR_SLAVE = csE;	             dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V1:				   SPI0_PUSHR_SLAVE = (vA >> 8) & 0xff;	 dataExpected = 1;  break;	
 			case SLAVE3_COMMANDS::V2:				   SPI0_PUSHR_SLAVE = (vB >> 8) & 0xff;	 dataExpected = 1;  break;	
 			case SLAVE3_COMMANDS::V3:				   SPI0_PUSHR_SLAVE = (vC >> 8) & 0xff;	 dataExpected = 1;  break;	
 			case SLAVE3_COMMANDS::V4:				   SPI0_PUSHR_SLAVE = (vD >> 8) & 0xff;	 dataExpected = 1;  break;	
-			case SLAVE3_COMMANDS::BRAKE1:			   
-				SPI0_PUSHR_SLAVE = 1; 
+			case SLAVE3_COMMANDS::BRAKE1:
+				pA = 0;
 				digitalWriteFast(MT_A_BRK, HIGH);	         
 				dataExpected = 0;  
 				break;
-			case SLAVE3_COMMANDS::BRAKE2:			   
-				SPI0_PUSHR_SLAVE = 1; 
+			case SLAVE3_COMMANDS::BRAKE2:
+				pB = 0;
 				digitalWriteFast(MT_B_BRK, HIGH);	         
 				dataExpected = 0;  
 				break;
-			case SLAVE3_COMMANDS::BRAKE3:			   
-				SPI0_PUSHR_SLAVE = 1;
+			case SLAVE3_COMMANDS::BRAKE3:
+				pC = 0;
 				digitalWriteFast(MT_C_BRK, HIGH);
 				dataExpected = 0;
 				break;
-			case SLAVE3_COMMANDS::BRAKE4:			   
-				SPI0_PUSHR_SLAVE = 1;
+			case SLAVE3_COMMANDS::BRAKE4:
+				pD = 0;
 				digitalWriteFast(MT_D_BRK, HIGH);
 				dataExpected = 0;  
 				break;
 			case SLAVE3_COMMANDS::BRAKE5:
-				SPI0_PUSHR_SLAVE = 1;
+				pE = 0;
 				digitalWriteFast(MT_E_BRK, HIGH);
 				dataExpected = 0;
 				break;
 			case SLAVE3_COMMANDS::BRAKEALL:
-				SPI0_PUSHR_SLAVE = 1;
-				dataExpected = 0;
+				pA = 0; pB = 0; pC = 0; pD = 0; pE = 0;
 				digitalWriteFast(MT_A_BRK, HIGH);
 				digitalWriteFast(MT_B_BRK, HIGH);
 				digitalWriteFast(MT_C_BRK, HIGH);
 				digitalWriteFast(MT_D_BRK, HIGH);
 				digitalWriteFast(MT_E_BRK, HIGH);
+				dataExpected = 0;
 				break;
 			case SLAVE3_COMMANDS::MOVE: 			   SPI0_PUSHR_SLAVE = 1;	         dataExpected = 1;  break;
 		}
@@ -408,13 +409,11 @@ void spi0_isr(){
 		// Serial.print("\tb");
 		// Serial.println(SPI0_POPR);
 		switch(command){ // command is really the previous command. 
-			case SLAVE3_COMMANDS::MOVE1: pA = SPI0_POPR << 8; SPI0_PUSHR_SLAVE = 2;	 dataExpected = 2;  
-			Serial.print(pA);
-			break;
-			case SLAVE3_COMMANDS::MOVE2: pB = SPI0_POPR << 8; SPI0_PUSHR_SLAVE = 2;	 dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE3: pC = SPI0_POPR << 8; SPI0_PUSHR_SLAVE = 2;	 dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE4: pD = SPI0_POPR << 8; SPI0_PUSHR_SLAVE = 2;	 dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE5: pE = SPI0_POPR << 8; SPI0_PUSHR_SLAVE = 2;	 dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE1: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE2: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE3: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE4: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE5: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
 			case SLAVE3_COMMANDS::V1:	 SPI0_PUSHR_SLAVE = vA & 0xff; dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V2:	 SPI0_PUSHR_SLAVE = vB & 0xff;	 dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V3:	 SPI0_PUSHR_SLAVE = vC & 0xff;	 dataExpected = 0;  break;
@@ -423,32 +422,20 @@ void spi0_isr(){
 		}		
 	}
 	else if (dataExpected == 2){
-		SPI0_PUSHR_SLAVE = 3;
 		// Serial.print("\tc");
 		// Serial.println(SPI0_POPR);
 		switch(command){ // command is really the previous command.
-			case SLAVE3_COMMANDS::MOVE1: pA |= SPI0_POPR;  dataExpected = 0; 
-			Serial.print("   "); Serial.println(pA);
-			break;
-			case SLAVE3_COMMANDS::MOVE2: pB |= SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE3: pC |= SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE4: pD |= SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE5: pE |= SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE: uint8_t asd = SPI0_POPR;  dataExpected = 3; break;
+			case SLAVE3_COMMANDS::MOVE1: pA = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE2: pB = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE3: pC = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE4: pD = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE5: pE = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE: velocity = SPI0_POPR;	SPI0_PUSHR_SLAVE = 3; dataExpected = 3; break;
 		}		
 	}
 	else if (dataExpected == 3){
-		SPI0_PUSHR_SLAVE = 4;
 		// Serial.println(SPI0_POPR);		
 		// Serial.print("\td");
-		switch(command){ // command is really the previous command.
-			case SLAVE3_COMMANDS::MOVE: velocity = SPI0_POPR;	dataExpected = 4; break;
-		}	
-	}
-	else if (dataExpected == 4){
-		SPI0_PUSHR_SLAVE = 5;
-		// Serial.print("\te");
-		// Serial.println(SPI0_POPR);
 		switch(command){ // command is really the previous command.
 			case SLAVE3_COMMANDS::MOVE:
 				rotation_velocity = SPI0_POPR; 
@@ -457,11 +444,11 @@ void spi0_isr(){
 				// dir = 195;
 				// velocity = 50;
 				// rotation_velocity = 0;
+				// SPI0_PUSHR_SLAVE = 4;
 				updateMove = true;
-
 				dataExpected = 0;
 				break;
-		}
+		}	
 	}
 	SPI0_SR |= SPI_SR_RFDF;
 	//delay(50);	
@@ -527,7 +514,7 @@ void encoderUpdate(){
 	// pB = 50;
 	// pC = 50;
 	// pD = 50;
-	pE = 100;
+	// pE = 100;
 	// encoder decoding stuff done. Begin PID
 	if (encoderUpdateCount == 50){ // update every 50 times
 		encoderUpdateCount = 0;
