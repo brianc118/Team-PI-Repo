@@ -38,7 +38,7 @@ uint8_t targetVelocity;
 /**********************************************************/
 /*                    Face forwards                       */
 /**********************************************************/
-#define BEARING_KP 0.2
+#define BEARING_KP 0.6
 #define BEARING_KD 0
 
 int32_t targetBearing = 0;
@@ -48,6 +48,10 @@ PID bearingPID (&bearing_int, &rotatationCorrection, &targetBearing,
 	BEARING_KP, 0, BEARING_KD, -255, 255, 1000);
 
 
+/**********************************************************/
+/*                      Backspin                          */
+/**********************************************************/
+int16_t backspinSpeed = 0;
 
 /**********************************************************/
 /*					     Camera   						  */
@@ -61,7 +65,7 @@ PID bearingPID (&bearing_int, &rotatationCorrection, &targetBearing,
 
 PixyI2C pixy1(PIXY1_ADDRESS);
 
-int goalAngle = 0;
+int16_t goalAngle = 0;
 
 /**********************************************************/
 /*					     Ultrasonics					  */
@@ -74,15 +78,20 @@ SRF08 srfBack(SRF_BACK_ADDRESS);
 SRF08 srfRight(SRF_RIGHT_ADDRESS);
 SRF08 srfLeft(SRF_LEFT_ADDRESS);
 
+int16_t backDistance, rightDistance, leftDistance;
+
+/**********************************************************/
+/*					       TSOPS    					  */
+/**********************************************************/
 
 uint8_t tsopAngleByte;
 int16_t tsopAngle;
+int16_t tsopAngle_r_goal; // tsop angle relative to goal
 uint8_t tsopStrength;
 uint8_t ballDistance;
 
-uint8_t x, y;
 uint8_t tsopData[24] = {0};
-int16_t backDistance, rightDistance, leftDistance;
+
 
 /**********************************************************/
 /*					       LASER    					  */
@@ -181,11 +190,33 @@ int main(void){
 
 	digitalWrite(LED, HIGH);
 
+	delay(500);
+
 	Slave1.begin(115200);
 	Slave2.begin();
 	Slave3.begin();
 
 	while(1){
+		/* ultrasonics */
+
+		// srfBack.getRangeIfCan(backDistance);
+		// srfRight.getRangeIfCan(rightDistance);
+		// srfLeft.getRangeIfCan(leftDistance);
+		/* end ultrasonics */
+
+		/* goal detection */
+		//pixy1.getBlocks();
+
+		if (pixy1.blocks[0].width * pixy1.blocks[0].height > 100 &&
+			abs(bearing) < 90){
+			goalAngle = (pixy1.blocks[0].x - 160) * 75 / 180;			
+		}
+		else{
+			goalAngle = 0;
+		}
+		/* end goal detection */
+
+		/* orientation/imu */
 		Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
 		Slave1.receivePacket(inBuffer, 7, true);
 		
@@ -196,29 +227,22 @@ int main(void){
 		bearing = -f2b.f;
 		bearing_int = (int32_t)bearing;
 
+		/* end orientation/imu */
+
+		/* tsops */
 		tsopAngleByte = Slave2.getTSOP_ANGLE_BYTE();
-		delayMicroseconds(1);
+		delayMicroseconds(50);
 		tsopStrength = Slave2.getTSOP_STRENGTH();
+		//Slave2.getTSOPAngleStrength(tsopAngleByte, tsopStrength);
+
 		ballDistance = 180 - tsopStrength;
 
 		tsopAngle = tsopAngleByte * 360/255;
-		if (tsopAngle > 180) tsopAngle -= 360;
+		TOBEARING180(tsopAngle);
+		tsopAngle_r_goal = tsopAngle - goalAngle;
+		TOBEARING180(tsopAngle_r_goal);
 
-
-		// pixy1.getBlocks();
-		srfBack.getRangeIfCan(backDistance);
-		srfRight.getRangeIfCan(rightDistance);
-		srfLeft.getRangeIfCan(leftDistance);
-
-		/* goal detection */
-		if (pixy1.blocks[0].width * pixy1.blocks[0].height > 100 &&
-			abs(bearing) < 90){
-			goalAngle = (pixy1.blocks[0].x - 160) * 75 / 180;			
-		}
-		else{
-			goalAngle = 0;
-		}
-		/* end goal detection */
+		/* end tsops */
 
 		/* ball in zone */
 		if (analogRead(LASER_SIG) < LASER_REF 
@@ -235,42 +259,46 @@ int main(void){
 		bearingPID.update();
 		/* end face forwards */
 
-		//simpleOrbit();
-		//Serial.println(goalAngle);
+		/*movement control*/
 
 		targetVelocity = 130;
+
 		orbit_k = 1;
-		if (tsopStrength > 150){
+
+		if (tsopStrength > 156){
 			orbit_k = 1.1;
 		}
+		else if (tsopStrength > 150){
+			orbit_k = 1.05;
+		}
 		else if (tsopStrength > 140){
-			orbit_k = 0.95;
+			orbit_k = 1.0;
 		}
 		else if (tsopStrength > 130){
-			orbit_k = 0.9;
+			orbit_k = 1.0;
 		}
 		else if (tsopStrength > 120){
-			orbit_k = 0.85;
+			orbit_k = 1;
 		}
 		else if (tsopStrength > 100){
-			orbit_k = 0.8;
+			orbit_k = 1;
 		}
 		else if (tsopStrength > 70){
-			orbit_k = 0.55;
+			orbit_k = 1;
 		}
 		else{
 			targetVelocity = 0;
 		}
 
-		if (tsopAngle > 90){
-			targetDir = (orbit_k * 180 - 90 + tsopAngle);
-		}
-		else if (tsopAngle < -90){
-			targetDir = (orbit_k * -180 + 90 + tsopAngle);
-		}
-		else{
+		// if (tsopAngle > 90){
+		// 	targetDir = (orbit_k * 180 - 90 + tsopAngle);
+		// }
+		// else if (tsopAngle < -90){
+		// 	targetDir = (orbit_k * -180 + 90 + tsopAngle);
+		// }
+		// else{
 			targetDir = orbit_k * (270 - abs(tsopAngle)) / 90 * tsopAngle;
-		}
+		// }
 
 		goalAngle = 0;
 		if (ballInZone && abs(goalAngle) < 10){
@@ -282,7 +310,49 @@ int main(void){
 
 		if (targetDir < 0) targetDir += 360;
 		targetDir = targetDir * 255/360;
+
+		/* end movement control */
+
+		/* backspin control */
+		if (tsopStrength > 70){
+			if (abs(targetDir) < 60){
+				if (ballInZone){
+					// we're going forwards and we have the ball
+					// no need for too much spin
+					backspinSpeed = 0;
+				}
+				else{
+					// forwards but ball not here yet!
+					backspinSpeed = 120;
+				}
+			}
+			else{
+				if (ballInZone){
+					// we're not going forwards but we have the ball
+					// best to spin a bit more as we need to guide the ball more
+					backspinSpeed = 150;
+				}
+				else{
+					// most common. Should only spin when ball is in front
+					if (abs(tsopAngle) < 60){
+						backspinSpeed = 255;
+					}
+					else{
+						// no chance of getting ball any time soon
+						backspinSpeed = 0;
+					}
+				}
+			}
+		}
+		else{
+			// no ball detected!
+			backspinSpeed = 0;
+		}
+		
+		/* end backspin control */
+
 		Slave3.moveRobot((uint8_t)targetDir, targetVelocity, rotatationCorrection);
+		Slave3.moveMotorE(backspinSpeed);
 
 		/* debugging */
 		Serial.printf("%d\t%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
