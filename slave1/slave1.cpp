@@ -163,11 +163,13 @@ int main(void){
 		slave1.imu.complementaryFilterBearing(0.98);
 		bearing = slave1.imu.yaw;
 
-		Serial.println(bearing, 2);
-		// Serial.print(slave1.imu.mx, 6);
+		
+		// Serial.print(slave1.imu.mx, 2);
 		// Serial.print('\t');
-		// Serial.println(slave1.imu.my, 6);
-		//Serial.print('\t');
+		// Serial.print(slave1.imu.my, 2);
+		// Serial.print('\t');
+		// Serial.println(bearing, 2);
+
 		//PRINTARRAY(slave1.lightArray.lightData);
 		slave1.lightArray.read();
 
