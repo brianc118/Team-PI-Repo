@@ -54,10 +54,18 @@ PID bearingPID (&bearing_int, &rotatationCorrection, &targetBearing,
 int16_t backspinSpeed = 0;
 
 /**********************************************************/
+/*                       Kicker                           */
+/**********************************************************/
+#define KICK_TIME 4000
+#define KICK_DURATION 80
+
+#define KICK_SIG 21
+#define KICK_ANA A3
+
+/**********************************************************/
 /*					     Camera   						  */
 /**********************************************************/
 #define PIXY1_ADDRESS 0x54   // default i2c address
-#define PIXY2_ADDRESS 0x55
 
 #define MIN_BLOCK_AREA   2000
 #define MIN_BLOCK_WIDTH  100
