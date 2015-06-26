@@ -197,6 +197,9 @@ int main(void){
 	pinMode(LED, OUTPUT);
 	pinMode(LASER_SIG, INPUT);
 
+	pinMode(KICK_SIG, OUTPUT);
+	pinMode(KICK_ANA, INPUT);
+
 	digitalWrite(LED, HIGH);
 
 	delay(500);
