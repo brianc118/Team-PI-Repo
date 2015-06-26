@@ -26,6 +26,7 @@ union float2bytes { float f; uint8_t b[sizeof(float)]; };
 float2bytes f2b;
 uint8_t inBuffer[22] = {0};
 float bearing;
+float bearing_offset;
 int32_t bearing_int;
 
 /**********************************************************/
@@ -110,80 +111,22 @@ uint8_t tsopData[24] = {0};
 
 bool ballInZone = false;
 
-
-int32_t ballAngle;
-
-int getOrbit(int angle, int strength){
-
-}
-
-void simpleChase(){
-	// for (int i = 0; i < 360; i++){
-	// 	Slave3.moveRobot(i, 20, 0);
-	// 	delay(20);
-	// }	
-	if (tsopAngleByte != 255){
-		Slave3.moveRobot(tsopAngleByte*180/255, 255, 0);
-		//Serial.println("move");
-	}
-	else{
-		Slave3.moveRobot(tsopAngleByte*180/255, 0, 0);
-		//Serial.println("stop");
-	}	
-}
-
-void calcOrbit(){
-	
-}
-void simpleOrbit(){
-	
-	int angleDeg = tsopAngleByte * 360/255;
-	int dir;
-	uint8_t speed = 110;
-	if (angleDeg >= 180){
-		angleDeg -= 360;
-	}
-
-	if (tsopStrength > 100){
-		// ball detected
+void calibIMUOffset(){
+	for (int i = 0; i < 50; i++){
+		Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
+		Slave1.receivePacket(inBuffer, 7, true);
 		
-		if (abs(angleDeg) <= 15){
-			dir = 0;
-			speed = 255;
-		}
-		else if (abs(angleDeg) <= 45){
-			dir = angleDeg * 1.3;
-		}
-		else if (abs(angleDeg) <= 60){
-			dir = angleDeg * 1.5;
-		}
-		else if (abs(angleDeg) <= 120){
-			dir = angleDeg * 1.8;
-		}
-		else{
-			dir = angleDeg * 1.2;
-		}
-
-		
-		// Serial.print("angleDeg\t");
-		// Serial.print(angleDeg);
-		// Serial.print("dir\t");
-		// Serial.print(dir);
-		// Serial.print('\t');
-		if (dir < 0){
-			dir += 360;
-		}
-		Serial.print(tsopStrength);
-		Serial.println("see ball");
-		Slave3.moveRobot(dir*255/360, speed, goalAngle);
-		//Serial.println("move");
+		f2b.b[0] = inBuffer[2];
+		f2b.b[1] = inBuffer[3];
+		f2b.b[2] = inBuffer[4];
+		f2b.b[3] = inBuffer[5];
+		bearing_offset += -f2b.f;
+		delay(1);
 	}
-	else{
-
-		Serial.println(goalAngle);
-		Slave3.moveRobot(tsopAngleByte*180/255, 0, goalAngle);
-		//Serial.println("stop");
-	}	
+	bearing_offset /= 50;
+	while(!Serial.available()){};
+	Serial.println(bearing_offset);
+	delay(2000);
 }
 
 int main(void){
@@ -194,6 +137,10 @@ int main(void){
 	SPI.setSCK(14);
 	SPI.begin();	
 
+	Slave1.begin(115200);
+	Slave2.begin();
+	Slave3.begin();
+
 	pinMode(LED, OUTPUT);
 	pinMode(LASER_SIG, INPUT);
 
@@ -202,11 +149,9 @@ int main(void){
 
 	digitalWrite(LED, HIGH);
 
-	delay(500);
+	delay(1000);
 
-	Slave1.begin(115200);
-	Slave2.begin();
-	Slave3.begin();
+	calibIMUOffset();
 
 	while(1){
 		/* ultrasonics */
@@ -237,8 +182,10 @@ int main(void){
 		f2b.b[1] = inBuffer[3];
 		f2b.b[2] = inBuffer[4];
 		f2b.b[3] = inBuffer[5];
-		bearing = -f2b.f;
-		bearing_int = (int32_t)bearing;
+		bearing = -f2b.f - bearing_offset;
+		bearing_int = round(bearing);
+		TOBEARING180(bearing_int);
+		TOBEARING180(bearing);
 
 		/* end orientation/imu */
 
