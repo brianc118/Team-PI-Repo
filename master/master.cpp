@@ -68,14 +68,17 @@ int16_t backspinSpeed = 0;
 /**********************************************************/
 #define PIXY1_ADDRESS 0x54   // default i2c address
 
-#define MIN_BLOCK_AREA   2000
-#define MIN_BLOCK_WIDTH  100
-#define MIN_BLOCK_HEIGHT 20
+#define MIN_BLOCK_AREA   200
 
 PixyI2C pixy1(PIXY1_ADDRESS);
 
 int16_t goalAngle = 0;
+int16_t goalAngle_rel_field = 0;
 uint16_t goalArea = 0;
+
+elapsedMillis lGoalDetectTime = 0;
+
+bool goalDetected = false;
 
 /**********************************************************/
 /*					     Ultrasonics					  */
@@ -124,9 +127,6 @@ void calibIMUOffset(){
 		delay(1);
 	}
 	bearing_offset /= 50;
-	while(!Serial.available()){};
-	Serial.println(bearing_offset);
-	delay(2000);
 }
 
 int main(void){
@@ -161,18 +161,6 @@ int main(void){
 		// srfLeft.getRangeIfCan(leftDistance);
 		/* end ultrasonics */
 
-		/* goal detection */
-		pixy1.getBlocks();
-		goalArea = pixy1.blocks[0].width * pixy1.blocks[0].height;
-		if (goalArea > 100
-//			&& abs(bearing) < 90
-			){
-			goalAngle = (pixy1.blocks[0].x - 160) * 75 / 360;			
-		}
-		else{
-			goalAngle = 0;
-		}
-		/* end goal detection */
 
 		/* orientation/imu */
 		Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
@@ -183,7 +171,7 @@ int main(void){
 		f2b.b[2] = inBuffer[4];
 		f2b.b[3] = inBuffer[5];
 		bearing = -f2b.f - bearing_offset;
-		bearing_int = round(bearing);
+		bearing_int = (int32_t)(bearing);
 		TOBEARING180(bearing_int);
 		TOBEARING180(bearing);
 
@@ -204,6 +192,34 @@ int main(void){
 
 		/* end tsops */
 
+		/* goal detection */
+		Serial.println(pixy1.getBlocks());
+		goalArea = pixy1.blocks[0].width * pixy1.blocks[0].height;
+
+		if (goalArea > MIN_BLOCK_AREA
+			&& abs(bearing) < 90
+			){
+			goalDetected = true;
+			goalAngle = (pixy1.blocks[0].x - 160) * 75 / 360;	
+			goalAngle_rel_field = goalAngle + bea
+			ring_int;
+			lGoalDetectTime = 0;		
+		}
+		else if (lGoalDetectTime > 100){
+			// hasn't seen goal for 100ms
+			goalDetected = false;
+			goalAngle = 0;
+		}
+		/* end goal detection */
+
+		/* face forwards */
+		if (goalDetected){
+			targetBearing = goalAngle_rel_field;
+		}
+
+		bearingPID.update();
+		/* end face forwards */
+
 		/* ball in zone */
 		if (analogRead(LASER_SIG) < LASER_REF 
 		 && abs(tsopAngle) < 30
@@ -214,10 +230,6 @@ int main(void){
 			ballInZone = false;
 		}
 		/* end ball in zone */
-
-		/* face forwards */
-		bearingPID.update();
-		/* end face forwards */
 
 		/*movement control*/
 
@@ -317,7 +329,7 @@ int main(void){
 		/* debugging */
 		Serial.printf("%d\t%d\t\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 					  micros(),
-					  goalAngle,
+					  goalAngle_rel_field,
 					  goalArea,
 					  bearing,
 					  backDistance,
