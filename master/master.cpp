@@ -300,7 +300,7 @@ int main(void){
 			targetDir = orbit_k * (270 - abs(tsopAngle)) / 90 * tsopAngle;
 		// }
 
-		goalAngle = 0;
+
 		if (ballInZone && abs(goalAngle) < 10){
 			// GO!
 			targetDir = goalAngle;
