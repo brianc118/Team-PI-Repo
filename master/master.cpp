@@ -66,6 +66,7 @@ int16_t backspinSpeed = 0;
 PixyI2C pixy1(PIXY1_ADDRESS);
 
 int16_t goalAngle = 0;
+uint16_t goalArea = 0;
 
 /**********************************************************/
 /*					     Ultrasonics					  */
