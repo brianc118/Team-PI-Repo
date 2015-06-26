@@ -39,7 +39,7 @@ uint8_t targetVelocity;
 /**********************************************************/
 /*                    Face forwards                       */
 /**********************************************************/
-#define BEARING_KP 0.6
+#define BEARING_KP 0.8
 #define BEARING_KD 0
 
 int32_t targetBearing = 0;
