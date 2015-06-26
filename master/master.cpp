@@ -217,11 +217,12 @@ int main(void){
 		/* end ultrasonics */
 
 		/* goal detection */
-		//pixy1.getBlocks();
-
-		if (pixy1.blocks[0].width * pixy1.blocks[0].height > 100 &&
-			abs(bearing) < 90){
-			goalAngle = (pixy1.blocks[0].x - 160) * 75 / 180;			
+		pixy1.getBlocks();
+		goalArea = pixy1.blocks[0].width * pixy1.blocks[0].height;
+		if (goalArea > 100
+//			&& abs(bearing) < 90
+			){
+			goalAngle = (pixy1.blocks[0].x - 160) * 75 / 360;			
 		}
 		else{
 			goalAngle = 0;
