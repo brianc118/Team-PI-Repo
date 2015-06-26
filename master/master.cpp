@@ -19,6 +19,8 @@
 
 #define LED 13
 
+uint32_t loopCount = 0;
+
 /**********************************************************/
 /*					     Slave1   						  */
 /**********************************************************/
@@ -132,7 +134,7 @@ void calibIMUOffset(){
 int main(void){
 	Serial.begin(115200);
 
-	Wire.begin();
+	Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_400);
 
 	SPI.setSCK(14);
 	SPI.begin();	
@@ -153,14 +155,14 @@ int main(void){
 
 	calibIMUOffset();
 
-	while(1){
-		/* ultrasonics */
-
-		// srfBack.getRangeIfCan(backDistance);
-		// srfRight.getRangeIfCan(rightDistance);
-		// srfLeft.getRangeIfCan(leftDistance);
-		/* end ultrasonics */
-
+	while(1){		
+		// save some time here
+		switch(loopCount % 4){
+			case 0: pixy1.getBlocks();
+			case 1: srfBack.getRangeIfCan(backDistance);
+			case 2: srfRight.getRangeIfCan(rightDistance);
+			case 3: srfLeft.getRangeIfCan(leftDistance);
+		}
 
 		/* orientation/imu */
 		Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
@@ -170,6 +172,7 @@ int main(void){
 		f2b.b[1] = inBuffer[3];
 		f2b.b[2] = inBuffer[4];
 		f2b.b[3] = inBuffer[5];
+
 		bearing = -f2b.f - bearing_offset;
 		bearing_int = (int32_t)(bearing);
 		TOBEARING180(bearing_int);
@@ -179,7 +182,7 @@ int main(void){
 
 		/* tsops */
 		tsopAngleByte = Slave2.getTSOP_ANGLE_BYTE();
-		delayMicroseconds(50);
+		delayMicroseconds(50); // do i need this here?
 		tsopStrength = Slave2.getTSOP_STRENGTH();
 		//Slave2.getTSOPAngleStrength(tsopAngleByte, tsopStrength);
 
@@ -193,7 +196,7 @@ int main(void){
 		/* end tsops */
 
 		/* goal detection */
-		Serial.println(pixy1.getBlocks());
+
 		goalArea = pixy1.blocks[0].width * pixy1.blocks[0].height;
 
 		if (goalArea > MIN_BLOCK_AREA
@@ -201,8 +204,7 @@ int main(void){
 			){
 			goalDetected = true;
 			goalAngle = (pixy1.blocks[0].x - 160) * 75 / 360;	
-			goalAngle_rel_field = goalAngle + bea
-			ring_int;
+			goalAngle_rel_field = goalAngle + bearing_int;
 			lGoalDetectTime = 0;		
 		}
 		else if (lGoalDetectTime > 100){
@@ -342,5 +344,7 @@ int main(void){
 					  targetVelocity,
 					  rotatationCorrection);
 		/* end debugging */
+
+		loopCount++;  // update loop count
 	}
 }
