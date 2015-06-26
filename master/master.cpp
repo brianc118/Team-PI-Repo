@@ -367,11 +367,10 @@ int main(void){
 		Slave3.moveMotorE(backspinSpeed);
 
 		/* debugging */
-		Serial.printf("%d\t%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+		Serial.printf("%d\t%d\t\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 					  micros(),
-					  pixy1.blocks[0].x,
-					  pixy1.blocks[0].width,
-					  pixy1.blocks[0].height,
+					  goalAngle,
+					  goalArea,
 					  bearing,
 					  backDistance,
 					  rightDistance,
