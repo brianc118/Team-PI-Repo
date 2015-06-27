@@ -16,6 +16,7 @@
 #include <SRF08.h>
 #include <fastTrig.h>
 #include <PID.h>
+#include <DebugUtils.h>
 
 #define LED 13
 
@@ -73,6 +74,8 @@ int16_t backspinSpeed = 0;
 #define MIN_BLOCK_AREA   200
 
 PixyI2C pixy1(PIXY1_ADDRESS);
+
+int16_t blocks = 0;
 
 int16_t goalAngle = 0;
 int16_t goalAngle_rel_field = 0;
@@ -158,7 +161,7 @@ int main(void){
 	while(1){		
 		// save some time here
 		switch(loopCount % 4){
-			case 0: pixy1.getBlocks();
+			case 0: blocks = pixy1.getBlocks();
 			case 1: srfBack.getRangeIfCan(backDistance);
 			case 2: srfRight.getRangeIfCan(rightDistance);
 			case 3: srfLeft.getRangeIfCan(leftDistance);
@@ -199,7 +202,8 @@ int main(void){
 
 		goalArea = pixy1.blocks[0].width * pixy1.blocks[0].height;
 
-		if (goalArea > MIN_BLOCK_AREA
+		if (blocks > 0
+			&& goalArea > MIN_BLOCK_AREA
 			&& abs(bearing) < 90
 			){
 			goalDetected = true;
@@ -329,7 +333,7 @@ int main(void){
 		Slave3.moveMotorE(backspinSpeed);
 
 		/* debugging */
-		Serial.printf("%d\t%d\t\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+		Serial.printf("%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 					  micros(),
 					  goalAngle_rel_field,
 					  goalArea,
@@ -343,6 +347,35 @@ int main(void){
 					  targetDir,
 					  targetVelocity,
 					  rotatationCorrection);
+
+		if(Serial.available()){
+			char serialCommand = Serial.read();
+			CLEARSERIAL(); // make sure you only read first byte and clear everything else
+			if (serialCommand == 'i'){
+				Serial.println("DEBUG INFO");
+				Serial.printf("%s %s %s %s %s %s %s %s %s %s %s %s %s %s \n",
+					  "micros()",
+					  "goalAngle_rel_field",
+					  "goalArea",
+					  "bearing",
+					  "backDistance",
+					  "rightDistance",
+					  "leftDistance",
+					  "tsopAngle",
+					  "ballDistance",
+					  "ballInZone",
+					  "targetDir",
+					  "targetVelocity",
+					  "rotatationCorrection");
+				Serial.println("PRESS ANY KEY TO CONTINUE");
+				// wait for key
+				while(!Serial.available());
+				CLEARSERIAL();
+			}
+			else{
+				Serial.println("UNKNOWN COMMAND");
+			}
+		}
 		/* end debugging */
 
 		loopCount++;  // update loop count
