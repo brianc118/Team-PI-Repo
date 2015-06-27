@@ -76,20 +76,33 @@ inline void commandRequestStandardPacket();
 
 void calibLight(){
 	Serial.println("place on white");
-	while(Serial.available() <= 0){};
+	while(!Serial.available()){};
 	CLEARSERIAL();
 
 	slave1.lightArray.calibWhite();
 	PRINTARRAY(slave1.lightArray.white);
 	Serial.println("place on green");
 
-	while(Serial.available() <= 0){};
-	while(Serial.available() > 0){
-		Serial.read();
-	}
+	while(!Serial.available()){};
+	CLEARSERIAL();
+
 	slave1.lightArray.calibGreen();
+	slave1.lightArray.endCalib();
 	PRINTARRAY(slave1.lightArray.green);
+	Serial.println();
+	Serial.println("calibrated references values");
 	PRINTARRAY(slave1.lightArray.refData);
+	Serial.print("bad light sensors: ");
+	for (int i = 0; i < 16; i++){
+		if (slave1.lightArray.refData[i] == 255){
+			Serial.print(i + 1);
+			Serial.print('\t');
+		}
+	}
+	Serial.println();
+	Serial.println("Send anything to continue");
+	while(!Serial.available()){};
+	CLEARSERIAL();
 }
 
 void calibMag(){
@@ -169,10 +182,13 @@ int main(void){
 		// Serial.print(slave1.imu.my, 2);
 		// Serial.print('\t');
 		// Serial.println(bearing, 2);
-
-		//PRINTARRAY(slave1.lightArray.lightData);
+		
 		slave1.lightArray.read();
-
+		slave1.lightArray.getColours();
+		Serial.println();
+		PRINTARRAY(slave1.lightArray.lightData);
+		PRINTARRAY(slave1.lightArray.colours);
+		delay(1000);
 		uint8_t command = slave1.checkIfRequested();
 
 		if (command != 255){
