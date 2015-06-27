@@ -1,48 +1,47 @@
-/*****************************************************************
-slave1.cpp
-Team Pi Slave 1 Code
-
-Author: Brian Chen
-Last updated by Brian on 28/11/2014 10:49:51 AM
-
-The Slave 1 functions as th orientation/location processor by acquiring
-data from the iNEMO LSM9DS0 IMU, and 24 light sensors. This data
-is interpreted and returned to the master Teensy using Serial/UART
-
-Non-floating point code is difficult to implement (go try yourself) especially
-with regard to the Madgwick filter. Until the program cycle runs at less than
-300Hz, I won't attempt to remove any floating point maths. Madgwick filtering
-has been tested to run at over 1000Hz with 400kHz i2c. Expect SPI to go even faster.
-
-Incompatible with anything but the Teensy (including 2.0 and ++2.0).
-Implements Serial.printf() built into core of Teensyduino.
-
-LSM9DS0 --------- Arduino
-	CSG -------------- 9
-	CSXM ------------- 10
-	SDOG ------------- 12
-	SDOXM ------------ 12 (tied to SDOG)
-	SCL -------------- 13
-	SDA -------------- 11a
-	VDD -------------- 3.3V
-	GND -------------- GND
-
-Program cycle frequency (without debugging/serial):
-	Clock				Teensyduino 1.19 	Teensyduino 1.20
-	48mHz				-					1452
-	72mHz				1805				1836
-	96mHz				1986				2015
-	120mHz				-					2130
-	144mHz				-					2559
-
-
-Dependencies:
- 	SFE_LSM9DS0
- 
-All other non core libraries are written by me.
-
-Copyright (c) 2014 Team Pi
-*****************************************************************/
+/*
+ * slave1.cpp
+ * Team Pi Slave 1 Code
+ * 
+ * The Slave 1 functions as th orientation/location processor by acquiring
+ * data from the iNEMO LSM9DS0 IMU, and 24 light sensors. This data
+ * is interpreted and returned to the master Teensy using Serial/UART
+ * 
+ * Non-floating point code is difficult to implement (go try yourself) especially
+ * with regard to the Madgwick filter. Until the program cycle runs at less than
+ * 300Hz, I won't attempt to remove any floating point maths. Madgwick filtering
+ * has been tested to run at over 1000Hz with 400kHz i2c. Expect SPI to go even faster.
+ * 
+ * Incompatible with anything but the Teensy (including 2.0 and ++2.0).
+ * Implements Serial.printf() built into core of Teensyduino.
+ * 
+ * LSM9DS0 --------- Arduino
+ * 	CSG -------------- 9
+ * 	CSXM ------------- 10
+ * 	SDOG ------------- 12
+ * 	SDOXM ------------ 12 (tied to SDOG)
+ * 	SCL -------------- 13
+ * 	SDA -------------- 11a
+ * 	VDD -------------- 3.3V
+ * 	GND -------------- GND
+ * 
+ * Program cycle frequency (without debugging/serial):
+ * 	Clock				Teensyduino 1.19 	Teensyduino 1.20
+ * 	48mHz				-					1452
+ * 	72mHz				1805				1836
+ * 	96mHz				1986				2015
+ * 	120mHz				-					2130
+ * 	144mHz				-					2559
+ * 
+ * 
+ * Dependencies:
+ *  	SFE_LSM9DS0
+ *  	EEPROMAnything
+ * All other non core libraries are written by me.
+ *
+ * By Brian Chen
+ * Originally authored in November 2014
+ * Copyright (c) 2015 Team PI
+ */
 
 
 #include <WProgram.h>
@@ -50,7 +49,6 @@ Copyright (c) 2014 Team Pi
 #include <EEPROM.h>
 #include <EEPROMAnything.h>
 #include <SPI.h>
-#include <Wire.h>
 #include <SFE_LSM9DS0.h>
 #include <piCommon.h>
 #include <slave1.h>

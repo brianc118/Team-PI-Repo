@@ -3,7 +3,8 @@
  * 
  *
  * by Brian Chen
- * (C) Team Pi 2014
+ * Originally authored in November 2014
+ * (C) Team PI 2015
  */
 
 

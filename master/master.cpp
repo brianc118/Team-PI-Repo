@@ -336,7 +336,7 @@ int main(void){
 	calibIMUOffset();
 
 	while(1){		
-		// save some time here
+		// save some time here as reading srf08's has seen to dramatically decrease performance
 		switch(loopCount % 4){
 			case 0: blocks = pixy1.getBlocks();
 			case 1: srfBack.getRangeIfCan(backDistance);

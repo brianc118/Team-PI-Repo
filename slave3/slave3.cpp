@@ -1,7 +1,6 @@
 /*
  * slave3.cpp - Team Pi Slave3 Code
  * 
- * Last updated by Brian on 28/11/2014 10:50:03 AM
  * 
  * Slave 3 runs as an SPI slave and is dedicated to motor speed control of
  * 4 motors (PID control from encoder feedback) and the 5th motor for
@@ -28,7 +27,8 @@
  * All other non core libraries are written by me.
  * 
  * by Brian Chen
- * (C) 2014 Team Pi 
+ * Originally authored in November 2014
+ * (C) 2015 Team Pi 
  */
 
 #include <WProgram.h>
