@@ -131,24 +131,24 @@ int main(void){
 		if (Serial.available()){
 			char serialCommand = Serial.read();
 			CLEARSERIAL(); // make sure you only read first byte and clear everything else
-			if (serialCommand = 'i'){
+			if (serialCommand == 'i'){
 				Serial.println("BEGIN IMU CALIBRATION");
 				Serial.println("ROTATE ROBOT");
 				Serial.println("SEND ANY KEY TO BEGIN");
 
 				// wait for key
-				while(Serial.available());
+				while(!Serial.available());
 				CLEARSERIAL();
 
 				Serial.println("\n\n\n------------------------------");
 				calibMag();
 			}
-			else if (serialCommand = 'l'){
+			else if (serialCommand == 'l'){
 				Serial.println("BEGIN LIGHT SENSOR CALIBRATION");
 				Serial.println("SEND ANY KEY TO BEGIN");
 
 				// wait for key
-				while(Serial.available());
+				while(!Serial.available());
 				CLEARSERIAL();
 
 				Serial.println("\n\n\n------------------------------");
