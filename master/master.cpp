@@ -38,7 +38,8 @@ int32_t bearing_int;
 /**********************************************************/
 /*                        Orbit                           */
 /**********************************************************/
-float orbit_k;
+float orbit_l = 0.5;
+float orbit_k = 1.0;
 int16_t targetDir;
 uint8_t targetVelocity;
 
@@ -214,7 +215,7 @@ void getGoalData(){
 	}
 }
 
-void getBackspinSpeed()}{
+void getBackspinSpeed(){
 	if (tsopStrength > 70){
 		if (abs(targetDir) < 60){
 			if (ballInZone){
@@ -400,6 +401,7 @@ int main(void){
 		else{
 			targetVelocity = 0;
 		}
+
 
 		// if (tsopAngle > 90){
 		// 	targetDir = (orbit_k * 180 - 90 + tsopAngle);
