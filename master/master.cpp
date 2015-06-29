@@ -65,12 +65,14 @@ int16_t backspinSpeed = 0;
 /*                       Kicker                           */
 /**********************************************************/
 #define KICK_TIME 4000
+#define KICK_DELAY 30
 #define KICK_DURATION 90
 
 #define KICK_SIG 21
 #define KICK_ANA A3
 
 bool kicking = false;
+bool kickDelayComplete = false;
 elapsedMillis capChargedTime = 0;
 
 /**********************************************************/
@@ -130,22 +132,33 @@ void kick(){
 	if (!kicking){
 		// not yet kicking start kick
 		kicking = true;
-		digitalWriteFast(KICK_SIG, HIGH);
-		capChargedTime = 0; // now effectively discharge time
-		// Serial.print(analogRead(KICK_ANA));
-		// Serial.println("KICK");
-	}
+		capChargedTime = 0;
+		Serial.print(millis());
+		Serial.println("KICK_MOTORS");
+	}	
 }
 
 void checkEndKick(){
 	if (kicking){
-		if (capChargedTime >= KICK_DURATION){
-			// end kick
-			kicking = false;
-			digitalWriteFast(KICK_SIG, LOW);
-			capChargedTime = 0;
-			// Serial.print(analogRead(KICK_ANA));
-			// Serial.println("END");
+		if (!kickDelayComplete && capChargedTime > KICK_DELAY){
+			kickDelayComplete = true;
+			digitalWriteFast(KICK_SIG, HIGH);
+			capChargedTime = 0; // now effectively discharge time
+			Serial.print(millis());
+			Serial.println("KICK");
+		}
+		else if (kickDelayComplete){
+			// currently actually kicking
+			if (capChargedTime >= KICK_DURATION){
+				// end kick
+				kicking = false;
+				kickDelayComplete = false;
+				digitalWriteFast(KICK_SIG, LOW);
+				capChargedTime = 0;
+				//Serial.print(analogRead(KICK_ANA));
+				Serial.print(millis());
+				Serial.println("END");
+			}
 		}
 	}
 	else{
@@ -154,18 +167,19 @@ void checkEndKick(){
 }
 
 void calibIMUOffset(){
-	for (int i = 0; i < 50; i++){
-		Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
-		Slave1.receivePacket(inBuffer, 7, true);
+	Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_OFFSET);
+	// for (int i = 0; i < 50; i++){
+	// 	Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
+	// 	Slave1.receivePacket(inBuffer, 7, true);
 		
-		f2b.b[0] = inBuffer[2];
-		f2b.b[1] = inBuffer[3];
-		f2b.b[2] = inBuffer[4];
-		f2b.b[3] = inBuffer[5];
-		bearing_offset += -f2b.f;
-		delay(1);
-	}
-	bearing_offset /= 50;
+	// 	f2b.b[0] = inBuffer[2];
+	// 	f2b.b[1] = inBuffer[3];
+	// 	f2b.b[2] = inBuffer[4];
+	// 	f2b.b[3] = inBuffer[5];
+	// 	bearing_offset += -f2b.f;
+	// 	delay(1);
+	// }
+	// bearing_offset /= 50;
 }
 
 void getSlave1Data(){
@@ -177,7 +191,7 @@ void getSlave1Data(){
 	f2b.b[2] = inBuffer[4];
 	f2b.b[3] = inBuffer[5];
 
-	bearing = -f2b.f - bearing_offset;
+	bearing = f2b.f;
 	bearing_int = (int32_t)(bearing);
 	TOBEARING180(bearing_int);
 	TOBEARING180(bearing);
@@ -216,39 +230,44 @@ void getGoalData(){
 }
 
 void getBackspinSpeed(){
-	if (tsopStrength > 70){
-		if (abs(targetDir) < 60){
-			if (ballInZone){
-				// we're going forwards and we have the ball
-				// no need for too much spin
-				backspinSpeed = 0;
+	if (!kicking){
+		if (tsopStrength > 70){
+			if (abs(targetDir) < 60){
+				if (ballInZone){
+					// we're going forwards and we have the ball
+					// no need for too much spin
+					backspinSpeed = 200;
+				}
+				else{
+					// forwards but ball not here yet!
+					backspinSpeed = 200;
+				}
 			}
 			else{
-				// forwards but ball not here yet!
-				backspinSpeed = 200;
+				if (ballInZone){
+					// we're not going forwards but we have the ball
+					// best to spin a bit more as we need to guide the ball more
+					backspinSpeed = 150;
+				}
+				else{
+					// most common. Should only spin when ball is in front
+					if (abs(tsopAngle) < 60){
+						backspinSpeed = 120;
+					}
+					else{
+						// no chance of getting ball any time soon
+						backspinSpeed = 0;
+					}
+				}
 			}
 		}
 		else{
-			if (ballInZone){
-				// we're not going forwards but we have the ball
-				// best to spin a bit more as we need to guide the ball more
-				backspinSpeed = 150;
-			}
-			else{
-				// most common. Should only spin when ball is in front
-				if (abs(tsopAngle) < 60){
-					backspinSpeed = 120;
-				}
-				else{
-					// no chance of getting ball any time soon
-					backspinSpeed = 0;
-				}
-			}
+			// no ball detected!
+			backspinSpeed = 0;
 		}
 	}
 	else{
-		// no ball detected!
-		backspinSpeed = 0;
+		backspinSpeed = -255;
 	}
 }
 
@@ -264,20 +283,20 @@ void checkBallInZone(){
 }
 
 void serialDebug(){
-	Serial.printf("%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
-				  micros(),
-				  goalAngle_rel_field,
-				  goalArea,
-				  bearing,
-				  backDistance,
-				  rightDistance,
-				  leftDistance,
-				  tsopAngle,
-				  ballDistance,
-				  ballInZone,
-				  targetDir,
-				  targetVelocity,
-				  rotatationCorrection);
+	// Serial.printf("%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+	// 			  micros(),
+	// 			  goalAngle_rel_field,
+	// 			  goalArea,
+	// 			  bearing,
+	// 			  backDistance,
+	// 			  rightDistance,
+	// 			  leftDistance,
+	// 			  tsopAngle,
+	// 			  ballDistance,
+	// 			  ballInZone,
+	// 			  targetDir,
+	// 			  targetVelocity,
+	// 			  rotatationCorrection);
 
 	if(Serial.available()){
 		char serialCommand = Serial.read();
@@ -332,7 +351,7 @@ int main(void){
 	digitalWrite(LED, HIGH);
 
 	delay(1000);
-
+	
 	calibIMUOffset();
 
 	while(1){		
@@ -412,8 +431,8 @@ int main(void){
 		// else{
 			targetDir = orbit_k * (270 - abs(tsopAngle)) / 90 * tsopAngle;
 		// }
-
-
+		goalDetected = true;
+		goalAngle = 0;
 		if (ballInZone && goalDetected && abs(goalAngle) < 10){
 			// GO!
 			targetDir = goalAngle;
