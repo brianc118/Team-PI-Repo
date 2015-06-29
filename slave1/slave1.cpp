@@ -40,10 +40,29 @@ elapsedMillis SerialRequestTime;
 
 
 float bearing = 0;
+float bearing_offset = 0;
+
 uint8_t outBuffer[22] = {0};
 
 inline void commandRequestStandardPacket();
 
+
+void calibIMUOffset(){
+	bearing_offset = 0;
+	for (int i = 0; i < 1000; i++){
+		slave1.imu.read();
+		slave1.imu.complementaryFilterBearing(0.98);
+	}
+	for (int i = 0; i < 50; i++){
+		slave1.imu.read();
+		slave1.imu.complementaryFilterBearing(0.98);
+		bearing = -slave1.imu.yaw;
+
+		bearing_offset += bearing;
+		delay(1);
+	}
+	bearing_offset /= 50;
+}
 
 void calibLight(){
 	Serial.println("place on white");
@@ -109,6 +128,8 @@ int main(void){
 	delay(200);
 	slave1.lightArray.init();
 	slave1.imu.init();
+
+	//calibIMUOffset();
 	//slave1.imu.calibOffset();
 	//calibMag();
 	while(1){   // Equivalent of the Arduino loop()
@@ -144,6 +165,10 @@ int main(void){
 		}
 
 		slave1.imu.read();
+		slave1.imu.complementaryFilterBearing(1);
+		bearing = -slave1.imu.yaw;
+		//bearing = bearing - bearing_offset;
+		TOBEARING180(bearing);
 		slave1.imu.complementaryFilterBearing(0.98);
 		bearing = slave1.imu.yaw;
 
@@ -156,6 +181,18 @@ int main(void){
 		
 		slave1.lightArray.read();
 		slave1.lightArray.getColours();
+		// Serial.println();
+		// PRINTARRAY(slave1.lightArray.lightData);
+		// PRINTARRAY(slave1.lightArray.colours);
+		// Serial.print(slave1.lightArray.armFrontSum);
+		// Serial.print('\t');
+		// Serial.print(slave1.lightArray.armBackSum);
+		// Serial.print('\t');
+		// Serial.print(slave1.lightArray.armRightSum);
+		// Serial.print('\t');
+		// Serial.println(slave1.lightArray.armLeftSum);
+		Serial.println(bearing, 2);
+
 		Serial.println();
 		PRINTARRAY(slave1.lightArray.lightData);
 		PRINTARRAY(slave1.lightArray.colours);
@@ -169,6 +206,7 @@ int main(void){
 	    			return slave1.peripheralStatus;
 	    			break;
 	    		case SLAVE1_COMMANDS::CALIB_OFFSET:
+	    			calibIMUOffset();
 	    			slave1.imu.calibOffset();
 	    			break;
 	    		case SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET:

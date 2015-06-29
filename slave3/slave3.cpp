@@ -263,7 +263,7 @@ int main(void){
 	// main loop
 	while(1){
 		delay(1);
-		Serial.println(csE);
+		//Serial.println(csE);
 		// for (int i = -255; i < 255; i++){
 		// 	MOVEMOTOR(i, MT_A_DIR, MT_A_BRK, MT_A_PWM)
 		// 	delay(10);
@@ -346,7 +346,7 @@ int main(void){
 // Interrupt Service Routine to handle incoming data
 void spi0_isr(){
 	noInterrupts();
-	SPIRequestTime = 0;
+	//SPIRequestTime = 0;
 	if (dataExpected == 0){
 		command = SPI0_POPR;
 		CLEARARRAY(spiBuff);
@@ -409,12 +409,12 @@ void spi0_isr(){
 		// Serial.print("\tb");
 		// Serial.println(SPI0_POPR);
 		switch(command){ // command is really the previous command. 
-			case SLAVE3_COMMANDS::MOVE1: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE2: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE3: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE4: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE5: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::V1:	 SPI0_PUSHR_SLAVE = vA & 0xff; dataExpected = 0;  break;
+			case SLAVE3_COMMANDS::MOVE1: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE2: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE3: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE4: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE5: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::V1:	 SPI0_PUSHR_SLAVE = vA & 0xff;   dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V2:	 SPI0_PUSHR_SLAVE = vB & 0xff;	 dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V3:	 SPI0_PUSHR_SLAVE = vC & 0xff;	 dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V4:	 SPI0_PUSHR_SLAVE = vD & 0xff;	 dataExpected = 0;  break;
@@ -424,12 +424,14 @@ void spi0_isr(){
 	else if (dataExpected == 2){
 		// Serial.print("\tc");
 		// Serial.println(SPI0_POPR);
+		int16_t p_;
+		spiBuff[1] = SPI0_POPR; 
 		switch(command){ // command is really the previous command.
-			case SLAVE3_COMMANDS::MOVE1: pA = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE2: pB = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE3: pC = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE4: pD = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE5: pE = (spiBuff[0] << 8) | SPI0_POPR;  dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE1: p_ = (spiBuff[0] << 8) | spiBuff[1];  pA = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE2: p_ = (spiBuff[0] << 8) | spiBuff[1];  pB = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE3: p_ = (spiBuff[0] << 8) | spiBuff[1];  pC = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE4: p_ = (spiBuff[0] << 8) | spiBuff[1];  pD = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE5: p_ = (spiBuff[0] << 8) | spiBuff[1];  pE = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
 			case SLAVE3_COMMANDS::MOVE: velocity = SPI0_POPR;	SPI0_PUSHR_SLAVE = 3; dataExpected = 3; break;
 		}		
 	}
@@ -444,7 +446,7 @@ void spi0_isr(){
 				// dir = 195;
 				// velocity = 50;
 				// rotation_velocity = 0;
-				// SPI0_PUSHR_SLAVE = 4;
+				SPI0_PUSHR_SLAVE = 4;
 				updateMove = true;
 				dataExpected = 0;
 				break;
