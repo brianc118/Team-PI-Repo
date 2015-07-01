@@ -127,10 +127,10 @@ int main(void){
 	pinMode(LED, OUTPUT);
 
 	slave1.begin(115200);
-	delay(200);
+	
 	slave1.lightArray.init();
 	slave1.imu.init();
-
+	//slave1.imu.calibGyroDrift();
 	//calibIMUOffset();
 	//slave1.imu.calibOffset();
 	//calibMag();
