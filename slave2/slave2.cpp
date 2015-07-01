@@ -33,7 +33,7 @@ volatile uint8_t vbatLV, vbatHV;
 /**********************************************************/
 
 T3SPI SPI; // create SPI object
-volatile uint8_t dataOut, dataIn; // SPI input/output bytes
+volatile uint8_t dataOut[2];
 volatile uint8_t command = 255;
 
 // blink
@@ -64,11 +64,10 @@ TSOPS tsops; // TSOPS object
 volatile uint8_t tsopAngleByte_vol;
 volatile uint8_t tsopStrength_vol;
 
-/* though tsops already has a member for the data, it's continuously 
+/* though tsops already has a member for the data, it's continuously f
    updated and incomplete this variable array stores the most recent 
    tsop data that has been complete (after 255 interrupts) */
 uint8_t tsopData[TSOP_COUNT]; 
-
 
 inline void initBatReadings();
 inline void readBat();
@@ -185,10 +184,14 @@ void spi0_isr(){
 		// case SLAVE2_COMMANDS::TSOP_DATA23:		   SPI0_PUSHR_SLAVE = tsopData[23];		     break; 
 		// case SLAVE2_COMMANDS::VBAT_REF_LV:		   SPI0_PUSHR_SLAVE = vbatLV;				 break;
 		// case SLAVE2_COMMANDS::VBAT_REF_HV:		   SPI0_PUSHR_SLAVE = vbatHV;				 break;
-		// case SLAVE2_COMMANDS::TSOP_ANGLE_HIGH:	   SPI0_PUSHR_SLAVE = highByte(tsops.angle); break;
-		// case SLAVE2_COMMANDS::TSOP_ANGLE_LOW:	   SPI0_PUSHR_SLAVE = lowByte(tsops.angle);  break;
-		case SLAVE2_COMMANDS::TSOP_ANGLE_BYTE:	   SPI0_PUSHR_SLAVE = tsops.angleByte;		 	 break;
-		case SLAVE2_COMMANDS::TSOP_STRENGTH:	   SPI0_PUSHR_SLAVE = tsops.averageStrength; 	 break;
+		case SLAVE2_COMMANDS::TSOP_ANGLE_HIGH:	   
+			dataOut[0] = highByte(tsops.angle); 
+			dataOut[1] = lowByte(tsops.angle); 
+			SPI0_PUSHR_SLAVE = dataOut[0];
+			break;
+		case SLAVE2_COMMANDS::TSOP_ANGLE_LOW:	   SPI0_PUSHR_SLAVE = dataOut[1];  break;
+		case SLAVE2_COMMANDS::TSOP_ANGLE_BYTE:	   SPI0_PUSHR_SLAVE = tsops.angleByte;	 break;
+		case SLAVE2_COMMANDS::TSOP_STRENGTH:	   SPI0_PUSHR_SLAVE = tsops.strength; 	 break;
 		default:  SPI0_PUSHR_SLAVE = 0;	break;
 	}
 	ledBlinkTime = 500;
@@ -204,9 +207,13 @@ void TSOP_ISR(){
 	}
 	else{
 		ledBlinkTime = 50;
+		Serial.print(vbatHV);
+		Serial.print('\t');
+		Serial.print(vbatLV);
+		Serial.print('\t');
 		Serial.print(tsops.averageStrength);
 		Serial.print('\t');
-		Serial.println(tsops.angle);
+		Serial.println(tsops.angleByte * 360/180);
 	}
 	// else, we're in a stage where we're unlocking the tsops.
 
