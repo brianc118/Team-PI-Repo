@@ -277,20 +277,20 @@ void checkBallInZone(){
 }
 
 void serialDebug(){
-	// Serial.printf("%d\t%d\t%d\t%.1f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
-	// 			  micros(),
-	// 			  goalAngle_rel_field,
-	// 			  goalArea,
-	// 			  bearing,
-	// 			  backDistance,
-	// 			  rightDistance,
-	// 			  leftDistance,
-	// 			  tsopAngle,
-	// 			  ballDistance,
-	// 			  ballInZone,
-	// 			  targetDir,
-	// 			  targetVelocity,
-	// 			  rotatationCorrection);
+	Serial.printf("%d\t%d\t%d\t%.0f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+				  micros(),
+				  goalAngle_rel_field,
+				  goalArea,
+				  bearing,
+				  backDistance,
+				  rightDistance,
+				  leftDistance,
+				  tsopAngle,
+				  tsopStrength,
+				  ballInZone,
+				  targetDir,
+				  targetVelocity,
+				  rotatationCorrection);
 
 	if(Serial.available()){
 		char serialCommand = Serial.read();
