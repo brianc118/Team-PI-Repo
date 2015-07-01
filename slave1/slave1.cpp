@@ -117,9 +117,10 @@ void calibMag(){
 	slave1.imu.storeMagCalibrations();
 	// calculate magnetometer calibrations
 	slave1.imu.preCalculateCalibParams();
-	while(Serial.available() > 0){
-		Serial.read();
-	}
+	CLEARSERIAL();
+	Serial.println("PRESS AND KEY TO CONTINUE");
+	while(!Serial.available()){};
+	CLEARSERIAL();
 }
 
 int main(void){	
