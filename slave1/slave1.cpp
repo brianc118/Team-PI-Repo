@@ -209,7 +209,6 @@ int main(void){
 	    			break;
 	    		case SLAVE1_COMMANDS::CALIB_OFFSET:
 	    			calibIMUOffset();
-	    			slave1.imu.calibOffset();
 	    			break;
 	    		case SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET:
 	    			commandRequestStandardPacket();
