@@ -193,7 +193,7 @@ void spi0_isr(){
 	}
 	ledBlinkTime = 500;
 	SPI0_SR |= SPI_SR_RFDF;
-	//Serial.println(command); //interrupts();
+	//Serial.println("command"); //interrupts();
 }
 
 // Routine to read tsops (as well as batteries)
