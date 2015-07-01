@@ -29,7 +29,7 @@
 
 #define LED 13
 
-#define COMPCONSTANT 0.999
+#define COMPCONSTANT 0.9
 
 union float2bytes { float f; uint8_t b[sizeof(float)]; };
 float2bytes f2b;
