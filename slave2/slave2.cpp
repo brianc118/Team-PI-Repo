@@ -204,6 +204,8 @@ void TSOP_ISR(){
 	}
 	else{
 		ledBlinkTime = 50;
+		Serial.print(tsops.averageStrength);
+		Serial.print('\t');
 		Serial.println(tsops.angle);
 	}
 	// else, we're in a stage where we're unlocking the tsops.
