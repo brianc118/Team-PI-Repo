@@ -357,10 +357,10 @@ int main(void){
 	while(1){		
 		// save some time here as reading srf08's has seen to dramatically decrease performance
 		switch(loopCount % 4){
-			case 0: blocks = pixy1.getBlocks();
-			case 1: srfBack.getRangeIfCan(backDistance);
-			case 2: srfRight.getRangeIfCan(rightDistance);
-			case 3: srfLeft.getRangeIfCan(leftDistance);
+			case 0: blocks = pixy1.getBlocks(); break;
+			case 1: srfBack.getRangeIfCan(backDistance); break;
+			case 2: srfRight.getRangeIfCan(rightDistance); break;
+			case 3: srfLeft.getRangeIfCan(leftDistance); break;
 		}
 
 		/* orientation/imu */
