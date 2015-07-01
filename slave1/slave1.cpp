@@ -247,7 +247,8 @@ inline void commandRequestStandardPacket(){
 	slave1.y = 30;
 	slave1.lineLocation = LINELOCATION::RECT_TOP;
 	f2b.f = bearing;
-
+	// Serial.print("sending");
+	// Serial.println(bearing);
 	outBuffer[0] = slave1.x;
 	outBuffer[1] = slave1.y;
 	outBuffer[2] = f2b.b[0];
