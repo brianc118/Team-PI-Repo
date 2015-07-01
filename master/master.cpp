@@ -197,14 +197,8 @@ void getSlave1Data(){
 	TOBEARING180(bearing);
 }
 
-void getSLave2Data(){
-	tsopAngleByte = Slave2.getTSOP_ANGLE_BYTE();
-	delayMicroseconds(50); // do i need this here?
-	tsopStrength = Slave2.getTSOP_STRENGTH();
-
-	ballDistance = 180 - tsopStrength;
-
-	tsopAngle = tsopAngleByte * 360/255;
+void getSlave2Data(){
+	Slave2.getTSOPAngleStrength(tsopAngle, tsopStrength);
 	TOBEARING180(tsopAngle);
 	tsopAngle_r_goal = tsopAngle - goalAngle;
 	TOBEARING180(tsopAngle_r_goal);
@@ -368,7 +362,7 @@ int main(void){
 		/* end orientation/imu */
 
 		/* tsops */
-		getSLave2Data();
+		getSlave2Data();
 		/* end tsops */
 
 		/* goal detection */
