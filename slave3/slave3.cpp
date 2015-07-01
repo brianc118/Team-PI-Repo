@@ -312,11 +312,11 @@ int main(void){
 		// 	updateMove = false;
 		// }
 		if (dataExpected == 0){
-			// Serial.print(dir);
-			// Serial.print('\t');
-			// Serial.print(velocity);
-			// Serial.print('\t');
-			// Serial.println(rotation_velocity);
+			Serial.print(dir);
+			Serial.print('\t');
+			Serial.print(velocity);
+			Serial.print('\t');
+			Serial.println(rotation_velocity);
 			// e = 0;
 			// Serial.print(rtA);
 			// Serial.print('\t');
@@ -409,11 +409,11 @@ void spi0_isr(){
 		// Serial.print("\tb");
 		// Serial.println(SPI0_POPR);
 		switch(command){ // command is really the previous command. 
-			case SLAVE3_COMMANDS::MOVE1: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE2: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE3: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE4: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
-			case SLAVE3_COMMANDS::MOVE5: spiBuff[0] = SPI0_POPR; SPI0_PUSHR_SLAVE = 2; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE1: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE2: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE3: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE4: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
+			case SLAVE3_COMMANDS::MOVE5: spiBuff[0] = SPI0_POPR; dataExpected = 2;  break;
 			case SLAVE3_COMMANDS::V1:	 SPI0_PUSHR_SLAVE = vA & 0xff;   dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V2:	 SPI0_PUSHR_SLAVE = vB & 0xff;	 dataExpected = 0;  break;
 			case SLAVE3_COMMANDS::V3:	 SPI0_PUSHR_SLAVE = vC & 0xff;	 dataExpected = 0;  break;
@@ -426,13 +426,14 @@ void spi0_isr(){
 		// Serial.println(SPI0_POPR);
 		int16_t p_;
 		spiBuff[1] = SPI0_POPR; 
+		
 		switch(command){ // command is really the previous command.
-			case SLAVE3_COMMANDS::MOVE1: p_ = (spiBuff[0] << 8) | spiBuff[1];  pA = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE2: p_ = (spiBuff[0] << 8) | spiBuff[1];  pB = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE3: p_ = (spiBuff[0] << 8) | spiBuff[1];  pC = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE4: p_ = (spiBuff[0] << 8) | spiBuff[1];  pD = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE5: p_ = (spiBuff[0] << 8) | spiBuff[1];  pE = (int32_t)p_;  SPI0_PUSHR_SLAVE = 3; dataExpected = 0; break;
-			case SLAVE3_COMMANDS::MOVE: velocity = SPI0_POPR;	SPI0_PUSHR_SLAVE = 3; dataExpected = 3; break;
+			case SLAVE3_COMMANDS::MOVE1: p_ = (spiBuff[0] << 8) | spiBuff[1];  pA = (int32_t)p_;   dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE2: p_ = (spiBuff[0] << 8) | spiBuff[1];  pB = (int32_t)p_;   dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE3: p_ = (spiBuff[0] << 8) | spiBuff[1];  pC = (int32_t)p_;   dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE4: p_ = (spiBuff[0] << 8) | spiBuff[1];  pD = (int32_t)p_;   dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE5: p_ = (spiBuff[0] << 8) | spiBuff[1];  pE = (int32_t)p_;   dataExpected = 0; break;
+			case SLAVE3_COMMANDS::MOVE: velocity = spiBuff[1]; SPI0_PUSHR_SLAVE = 3; dataExpected = 3; break;
 		}		
 	}
 	else if (dataExpected == 3){
@@ -446,7 +447,7 @@ void spi0_isr(){
 				// dir = 195;
 				// velocity = 50;
 				// rotation_velocity = 0;
-				SPI0_PUSHR_SLAVE = 4;
+				// SPI0_PUSHR_SLAVE = 4;
 				updateMove = true;
 				dataExpected = 0;
 				break;
