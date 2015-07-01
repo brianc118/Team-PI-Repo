@@ -29,6 +29,8 @@
 
 #define LED 13
 
+#define COMPCONSTANT 0.999
+
 union float2bytes { float f; uint8_t b[sizeof(float)]; };
 float2bytes f2b;
 
@@ -49,13 +51,13 @@ inline void commandRequestStandardPacket();
 
 void calibIMUOffset(){
 	bearing_offset = 0;
-	for (int i = 0; i < 1000; i++){
+	for (int i = 0; i < 10000; i++){
 		slave1.imu.read();
-		slave1.imu.complementaryFilterBearing(0.98);
+		slave1.imu.complementaryFilterBearing(COMPCONSTANT);
 	}
 	for (int i = 0; i < 50; i++){
 		slave1.imu.read();
-		slave1.imu.complementaryFilterBearing(0.98);
+		slave1.imu.complementaryFilterBearing(COMPCONSTANT);
 		bearing = -slave1.imu.yaw;
 
 		bearing_offset += bearing;
@@ -165,19 +167,19 @@ int main(void){
 		}
 
 		slave1.imu.read();
-		slave1.imu.complementaryFilterBearing(1);
+		slave1.imu.complementaryFilterBearing(COMPCONSTANT);
 		bearing = -slave1.imu.yaw;
 		//bearing = bearing - bearing_offset;
-		TOBEARING180(bearing);
-		slave1.imu.complementaryFilterBearing(0.98);
-		bearing = slave1.imu.yaw;
+		TOBEARING180(bearing);		
 
 		
 		// Serial.print(slave1.imu.mx, 2);
 		// Serial.print('\t');
 		// Serial.print(slave1.imu.my, 2);
 		// Serial.print('\t');
-		// Serial.println(bearing, 2);
+		Serial.print(micros());
+		Serial.print('\t');
+		Serial.println(bearing, 2);
 		
 		slave1.lightArray.read();
 		slave1.lightArray.getColours();
