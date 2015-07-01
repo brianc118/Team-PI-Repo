@@ -170,7 +170,7 @@ int main(void){
 		slave1.imu.read();
 		slave1.imu.complementaryFilterBearing(COMPCONSTANT);
 		bearing = -slave1.imu.yaw;
-		//bearing = bearing - bearing_offset;
+		bearing = bearing - bearing_offset;
 		TOBEARING180(bearing);		
 
 		
