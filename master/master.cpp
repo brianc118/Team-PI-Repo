@@ -306,7 +306,7 @@ void serialDebug(){
 				  "rightDistance",
 				  "leftDistance",
 				  "tsopAngle",
-				  "ballDistance",
+				  "tsopStrength",
 				  "ballInZone",
 				  "targetDir",
 				  "targetVelocity",
