@@ -193,11 +193,11 @@ int main(void){
 		// Serial.print(slave1.lightArray.armRightSum);
 		// Serial.print('\t');
 		// Serial.println(slave1.lightArray.armLeftSum);
-		Serial.println(bearing, 2);
+		// Serial.println(bearing, 2);
 
-		Serial.println();
-		PRINTARRAY(slave1.lightArray.lightData);
-		PRINTARRAY(slave1.lightArray.colours);
+		// Serial.println();
+		// PRINTARRAY(slave1.lightArray.lightData);
+		// PRINTARRAY(slave1.lightArray.colours);
 		
 		uint8_t command = slave1.checkIfRequested();
 
