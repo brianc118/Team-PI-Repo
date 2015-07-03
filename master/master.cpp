@@ -393,25 +393,25 @@ int main(void){
 		orbit_k = 1;
 
 		if (tsopStrength > 156){
-			orbit_k = 1.1;
+			orbit_k = 1.0;
 		}
 		else if (tsopStrength > 150){
-			orbit_k = 1.05;
+			orbit_k = 0.9;
 		}
 		else if (tsopStrength > 140){
-			orbit_k = 1.0;
+			orbit_k = 0.8;
 		}
 		else if (tsopStrength > 130){
-			orbit_k = 1.0;
+			orbit_k = 0.7;
 		}
 		else if (tsopStrength > 120){
-			orbit_k = 1;
+			orbit_k = 0.6;
 		}
 		else if (tsopStrength > 100){
-			orbit_k = 1;
+			orbit_k = 0.55;
 		}
 		else if (tsopStrength > 70){
-			orbit_k = 1;
+			orbit_k = 0.5;
 		}
 		else{
 			targetVelocity = 0;
@@ -425,9 +425,8 @@ int main(void){
 		// 	targetDir = (orbit_k * -180 + 90 + tsopAngle);
 		// }
 		// else{
-			targetDir = orbit_k * (270 - abs(tsopAngle)) / 90 * tsopAngle;
+			targetDir = (270 - abs(tsopAngle * orbit_k)) / 90 * tsopAngle * orbit_k;
 		// }
-		goalDetected = true;
 		goalAngle = 0;
 		if (ballInZone && goalDetected && abs(goalAngle) < 10){
 			// GO!
