@@ -207,7 +207,7 @@ void getSlave2Data(){
 void getGoalData(){
 	goalArea = pixy1.blocks[0].width * pixy1.blocks[0].height;
 
-	if (blocks > 0
+	if (blocks > 0 && blocks < 1000
 		&& goalArea > MIN_BLOCK_AREA
 		&& abs(bearing) < 90
 		){
