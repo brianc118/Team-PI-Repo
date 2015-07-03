@@ -215,6 +215,8 @@ void getGoalData(){
 		goalAngle = (pixy1.blocks[0].x - 160) * 75 / 360;	
 		goalAngle_rel_field = goalAngle + bearing_int;
 		lGoalDetectTime = 0;		
+		// Serial.print("goaldetected");
+		// Serial.println(blocks);
 	}
 	else if (lGoalDetectTime > 100){
 		// hasn't seen goal for 100ms
