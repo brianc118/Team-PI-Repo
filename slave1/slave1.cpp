@@ -224,7 +224,7 @@ int main(void){
 		if (SerialRequestTime > 100){
 			// no SPI requests for past 100ms!
 			// fast blink to show error
-			ledBlinkTime = 50;
+			ledBlinkTime = 30;
 		}
 		else{
 			ledBlinkTime = 500;
