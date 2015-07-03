@@ -25,6 +25,13 @@
 
 uint32_t loopCount = 0;
 
+// blink
+elapsedMillis ledElapsedTime;
+
+bool ledState = true;
+uint32_t ledBlinkTime = 500;
+
+
 /**********************************************************/
 /*					     Slave1   						  */
 /**********************************************************/
@@ -127,6 +134,20 @@ uint8_t tsopData[24] = {0};
 #define LASER_REF 152
 
 bool ballInZone = false;
+
+inline void ledBlink(){
+	// led blinking
+	if (ledElapsedTime > ledBlinkTime){
+		if (ledState){
+			digitalWriteFast(LED, HIGH);
+		}
+		else{
+			digitalWriteFast(LED, LOW);
+		}
+		ledState = !ledState;
+		ledElapsedTime = 0;
+	}
+}
 
 void kick(){
 	if (!kicking){
@@ -358,7 +379,6 @@ int main(void){
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
 			case 3: srfLeft.getRangeIfCan(leftDistance); break;
 		}
-
 		/* orientation/imu */
 		getSlave1Data();
 		/* end orientation/imu */
@@ -448,9 +468,10 @@ int main(void){
 		if (targetDir < 0) targetDir += 360;
 		targetDir = targetDir * 255/360;
 
-		// Slave3.moveRobot((uint8_t)targetDir, targetVelocity, rotatationCorrection);
+		Slave3.moveRobot((uint8_t)targetDir, targetVelocity, rotatationCorrection);
 		Slave3.moveMotorE(backspinSpeed);
 
+		ledBlink();
 		/* debugging */
 		serialDebug();
 		/* end debugging */
