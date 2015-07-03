@@ -42,6 +42,9 @@ elapsedMillis ledElapsedTime;
 bool ledState = true;
 uint32_t ledBlinkTime = 500;
 
+uint32_t spiRequestCount = 0;
+uint32_t spiRequestCount_prev = 0;
+
 /**********************************************************/
 /*						TSOPS						   */
 /**********************************************************/
@@ -194,8 +197,8 @@ void spi0_isr(){
 		case SLAVE2_COMMANDS::TSOP_STRENGTH:	   SPI0_PUSHR_SLAVE = tsops.strength; 	 break;
 		default:  SPI0_PUSHR_SLAVE = 0;	break;
 	}
-	ledBlinkTime = 500;
 	SPI0_SR |= SPI_SR_RFDF;
+	spiRequestCount++;
 	//Serial.println("command"); //interrupts();
 }
 
@@ -206,7 +209,6 @@ void TSOP_ISR(){
 		tsops.read();
 	}
 	else{
-		ledBlinkTime = 50;
 		Serial.print(vbatHV);
 		Serial.print('\t');
 		Serial.print(vbatLV);
@@ -240,6 +242,13 @@ void TSOP_ISR(){
 			tsopsOn = false; // this tells the program to wait before turning tsops back on
 			readBat();	// don't need to read batteries that often
 			TSOP_ISR_Count = 0;
+			if (spiRequestCount == spiRequestCount_prev){
+				ledBlinkTime = 30;
+			}
+			else{
+				ledBlinkTime = 500;
+			}
+			spiRequestCount_prev = spiRequestCount;
 		}  
 	}	
 	else{

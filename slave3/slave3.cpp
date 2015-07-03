@@ -69,8 +69,10 @@ T3SPI SPI;
 
 volatile uint8_t dataExpected = 0;
 volatile uint8_t command;
-volatile uint32_t spi0_isr_count = 0;
 volatile uint8_t spiBuff[5] = {0};
+
+volatile uint32_t spiRequestCount = 0;
+volatile uint32_t spiRequestCount_prev = 0;
 
 /**MOTORS********************************************************/
 #define MAX_RPM		12400 // theoretical max rpm of Maxon motor according to datasheet
@@ -186,7 +188,6 @@ elapsedMillis ledElapsedTime;
 
 bool ledState = true;
 uint32_t ledBlinkTime = 500;
-elapsedMillis SPIRequestTime;
 
 int main(void){
 	CORE_PIN33_CONFIG = 0;  // completely disables the pin
@@ -251,7 +252,6 @@ int main(void){
   	NVIC_SET_PRIORITY(IRQ_SPI0, 127); // set priority
  	NVIC_ENABLE_IRQ(IRQ_SPI0);	// SPI interrupt 	
 
- 	SPIRequestTime = 0;
 #ifdef HARDWAREDECODE
 	xPosn.start();		// Start Quad Decode position count
 	yPosn.start();		// Start Quad Decode position count
@@ -346,7 +346,6 @@ int main(void){
 // Interrupt Service Routine to handle incoming data
 void spi0_isr(){
 	noInterrupts();
-	//SPIRequestTime = 0;
 	if (dataExpected == 0){
 		command = SPI0_POPR;
 		CLEARARRAY(spiBuff);
@@ -455,21 +454,13 @@ void spi0_isr(){
 	}
 	SPI0_SR |= SPI_SR_RFDF;
 	//delay(50);	
-	spi0_isr_count++;
+	spiRequestCount++;
 	//Serial.println();
 	interrupts();
 }
 
 inline void ledBlink(){
 	// led blinking
-	if (SPIRequestTime > 100){
-		// no SPI requests for past 100ms!
-		// fast blink to show error
-		ledBlinkTime = 50;
-	}
-	else{
-		ledBlinkTime = 500;
-	}
 	if (ledElapsedTime > ledBlinkTime){
 		if (ledState){
 			digitalWriteFast(LED, HIGH);
@@ -519,8 +510,7 @@ void encoderUpdate(){
 	// pD = 50;
 	// pE = 100;
 	// encoder decoding stuff done. Begin PID
-	if (encoderUpdateCount == 50){ // update every 50 times
-		encoderUpdateCount = 0;
+	if (encoderUpdateCount % 50 == 0){ // update every 50 times
 		switch(channelCount){
 			case 0:
 				vA = rtA - prA;	 // get elapsed counts. Should not overflow/underflow.
@@ -559,6 +549,16 @@ void encoderUpdate(){
 				ledBlink();
 				channelCount = 0;
 				break;
+		}
+		if (encoderUpdateCount == 50 * 500){
+			encoderUpdateCount = 0;
+			if (spiRequestCount == spiRequestCount_prev){
+				ledBlinkTime = 30;
+			}
+			else{
+				ledBlinkTime = 500;
+			}
+			spiRequestCount_prev = spiRequestCount;
 		}
 	}
 	encoderUpdateCount++;
