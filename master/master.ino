@@ -10,6 +10,7 @@
 #include <WProgram.h>
 #include <i2c_t3.h>
 #include <SPI.h>
+#include <ILI9341_t3.h>
 #include <slaves.h>
 #include <piCommon.h>
 #include <PixyI2C.h> // modified for i2c_t3
@@ -18,10 +19,12 @@
 #include <PID.h>
 #include <DebugUtils.h>
 
+#define DEBUG_SERIAL
+ 
 #define LED 13
 
-#define RAMMING_SPEED 200
-#define NORMAL_SPEED 130
+#define RAMMING_SPEED 0
+#define NORMAL_SPEED 0
 
 uint32_t loopCount = 0;
 
@@ -48,19 +51,21 @@ int32_t bearing_int;
 float orbit_l = 0.5;
 float orbit_k = 1.0;
 int16_t targetDir;
+int16_t targetDir_r_field;
 uint8_t targetVelocity;
 
 /**********************************************************/
 /*                    Face forwards                       */
 /**********************************************************/
-#define BEARING_KP 0.8
-#define BEARING_KD 0
+#define BEARING_KP 1
+#define BEARING_KD 0.1
+#define ROTATIONCORRECTION_MAX 50
 
 int32_t targetBearing = 0;
 int32_t rotatationCorrection;
 
 PID bearingPID (&bearing_int, &rotatationCorrection, &targetBearing,
-	BEARING_KP, 0, BEARING_KD, -255, 255, 1000);
+	BEARING_KP, 0, BEARING_KD, -ROTATIONCORRECTION_MAX, ROTATIONCORRECTION_MAX, 1000);
 
 
 /**********************************************************/
@@ -85,6 +90,9 @@ elapsedMillis capChargedTime = 0;
 /**********************************************************/
 /*					     Camera   						  */
 /**********************************************************/
+
+//#define PIXY_ENABLED
+
 #define PIXY1_ADDRESS 0x54   // default i2c address
 
 #define MIN_BLOCK_AREA   1500
@@ -120,7 +128,8 @@ int16_t backDistance, rightDistance, leftDistance;
 
 uint8_t tsopAngleByte;
 int16_t tsopAngle;
-int16_t tsopAngle_r_goal; // tsop angle relative to goal
+int16_t tsopAngle_r_field;
+int16_t tsopAngle_r_targetBearing;
 uint8_t tsopStrength;
 uint8_t ballDistance;
 
@@ -221,8 +230,6 @@ void getSlave1Data(){
 void getSlave2Data(){
 	Slave2.getTSOPAngleStrength(tsopAngle, tsopStrength);
 	TOBEARING180(tsopAngle);
-	tsopAngle_r_goal = tsopAngle - goalAngle;
-	TOBEARING180(tsopAngle_r_goal);
 }
 
 void getGoalData(){
@@ -234,7 +241,6 @@ void getGoalData(){
 		){
 		goalDetected = true;
 		goalAngle = (pixy1.blocks[0].x - 160) * 75 / 360;	
-		goalAngle_rel_field = goalAngle + bearing_int;
 		lGoalDetectTime = 0;		
 		// Serial.print("goaldetected");
 		// Serial.println(blocks);
@@ -242,8 +248,10 @@ void getGoalData(){
 	else if (lGoalDetectTime > 100){
 		// hasn't seen goal for 100ms
 		goalDetected = false;
-		goalAngle = 0;
+		goalAngle = -bearing_int;
 	}
+
+	goalAngle_rel_field = goalAngle + bearing_int;
 }
 
 void getBackspinSpeed(){
@@ -253,7 +261,7 @@ void getBackspinSpeed(){
 				if (ballInZone){
 					// we're going forwards and we have the ball
 					// no need for too much spin
-					backspinSpeed = 200;
+					backspinSpeed = 120;
 				}
 				else{
 					// forwards but ball not here yet!
@@ -300,19 +308,22 @@ void checkBallInZone(){
 }
 
 void serialDebug(){
-	Serial.printf("%d\t%d\t%d\t%.0f\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+#ifdef DEBUG_SERIAL
+	Serial.printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%.0f\t%d\n",
 				  micros(),
 				  goalAngle_rel_field,
 				  goalArea,
-				  bearing,
 				  backDistance,
 				  rightDistance,
 				  leftDistance,
 				  tsopAngle,
+				  tsopAngle_r_targetBearing,
 				  tsopStrength,
 				  ballInZone,
 				  targetDir,
+				  targetDir_r_field,
 				  targetVelocity,
+				  bearing,
 				  rotatationCorrection);
 
 	if(Serial.available()){
@@ -343,11 +354,13 @@ void serialDebug(){
 			Serial.println("UNKNOWN COMMAND");
 		}
 	}
+#endif
 }
 
-int main(void){	
+extern "C" int main(void){	
 	Serial.begin(115200);
 
+	// begin i2c at 400kHz
 	Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_400);
 
 	SPI.setSCK(14);
@@ -374,7 +387,9 @@ int main(void){
 	while(1){		
 		// save some time here as reading srf08's has seen to dramatically decrease performance
 		switch(loopCount % 4){
+#ifdef PIXY_ENABLED
 			case 0: blocks = pixy1.getBlocks(); break;
+#endif
 			case 1: srfBack.getRangeIfCan(backDistance); break;
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
 			case 3: srfLeft.getRangeIfCan(leftDistance); break;
@@ -385,6 +400,8 @@ int main(void){
 
 		/* tsops */
 		getSlave2Data();
+		tsopAngle_r_field = tsopAngle + bearing_int;
+		TOBEARING180(tsopAngle_r_field);
 		/* end tsops */
 
 		/* goal detection */
@@ -392,13 +409,9 @@ int main(void){
 		/* end goal detection */
 
 		/* face forwards */
-		if (goalDetected){
-			targetBearing = goalAngle_rel_field;
-		}
-		else{
-			targetBearing = 0;
-		}
-
+		targetBearing = goalAngle_rel_field; // always face goals
+		tsopAngle_r_targetBearing = tsopAngle_r_field - targetBearing; // target bearing is relative to field
+		TOBEARING180(tsopAngle_r_targetBearing);
 		bearingPID.update();
 		/* end face forwards */
 
@@ -445,9 +458,12 @@ int main(void){
 		// 	targetDir = (orbit_k * -180 + 90 + tsopAngle);
 		// }
 		// else{
-			targetDir = (270 - abs(tsopAngle * orbit_k)) / 90 * tsopAngle * orbit_k;
+		targetDir_r_field = (270 - abs(tsopAngle_r_targetBearing * orbit_k)) / 90 * tsopAngle_r_targetBearing * orbit_k;
+		TOBEARING180(targetDir_r_field);
+		targetDir = targetDir_r_field - bearing_int;
+		TOBEARING180(targetDir);
 		// }
-		goalAngle = 0;
+		goalDetected = true;
 		if (ballInZone && goalDetected && abs(goalAngle) < 10){
 			// GO!
 			targetDir = goalAngle;
@@ -465,10 +481,7 @@ int main(void){
 		getBackspinSpeed();
 		/* end backspin control */
 
-		if (targetDir < 0) targetDir += 360;
-		targetDir = targetDir * 255/360;
-
-		Slave3.moveRobot((uint8_t)targetDir, targetVelocity, rotatationCorrection);
+		Slave3.moveRobot((uint8_t)(targetDir * 255/360), targetVelocity, rotatationCorrection);
 		Slave3.moveMotorE(backspinSpeed);
 
 		ledBlink();
