@@ -68,6 +68,7 @@ uint8_t inBuffer[24] = {0};
 float bearing;
 float bearing_offset;
 int32_t bearing_int;
+uint8_t linelocation;
 
 /**********************************************************/
 /*                        Orbit                           */
@@ -305,6 +306,8 @@ void getSlave1Data(){
 	Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
 	Slave1.receivePacket(inBuffer, 7, true);
 	
+	linelocation = inBuffer[6];
+
 	f2b.b[0] = inBuffer[2];
 	f2b.b[1] = inBuffer[3];
 	f2b.b[2] = inBuffer[4];
@@ -468,11 +471,12 @@ void initDebugTFT(){
 	tft.println("targetVelocity");
 	tft.println("bearing");
 	tft.println("rotationCorrection");
-
+	tft.setTextColor(ILI9341_CYAN);
+	tft.println("linelocation");
 }
 void debugTFT(){
 	tft.fillRect(160, 32, 60, 145, ILI9341_BLACK);
-	tft.setCursor(160, 50);
+	tft.setCursor(160, 40);
 	tft.x_offset = 160;
 
 	tft.setTextColor(ILI9341_RED);
@@ -496,6 +500,8 @@ void debugTFT(){
 	tft.println(targetVelocity);
 	tft.println(bearing);
 	tft.println(rotationCorrection);
+	tft.setTextColor(ILI9341_CYAN);
+	tft.println(linelocation);
 	tft.x_offset = 0;
 }
 
