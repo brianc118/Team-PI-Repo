@@ -116,7 +116,7 @@ void setup() {
   Wire.begin(I2C_MASTER, 0, 0, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_800);
   Serial.begin(115200);
   Serial.println(F("Cap Touch Paint!"));
-
+  delay(1000);
   tft.begin();
   tft.setRotation(3);
   tft.fillScreen(BLACK);
