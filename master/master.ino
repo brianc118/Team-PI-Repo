@@ -12,6 +12,7 @@
 #include <SPI.h>
 #include <ILI9341_t3.h>
 #include <Adafruit_FT6206.h>
+#include <piGFX.h>
 #include <slaves.h>
 #include <piCommon.h>
 #include <PixyI2C.h> // modified for i2c_t3
@@ -51,12 +52,19 @@ Adafruit_FT6206 ctp = Adafruit_FT6206();
 bool touched = false;
 POINT touchedPoint;
 
+BUTTON tftEnableBtn(&tft, &touchedPoint);
+BUTTON magBtn(&tft, &touchedPoint);
+BUTTON ltBtn(&tft, &touchedPoint);
+BUTTON kickBtn(&tft, &touchedPoint);
+
+bool kickMode = false;
+
 /**********************************************************/
 /*					     Slave1   						  */
 /**********************************************************/
 union float2bytes { float f; uint8_t b[sizeof(float)]; };
 float2bytes f2b;
-uint8_t inBuffer[22] = {0};
+uint8_t inBuffer[24] = {0};
 float bearing;
 float bearing_offset;
 int32_t bearing_int;
@@ -78,9 +86,9 @@ uint8_t targetVelocity;
 #define ROTATIONCORRECTION_MAX 50
 
 int32_t targetBearing = 0;
-int32_t rotatationCorrection;
+int32_t rotationCorrection;
 
-PID bearingPID (&bearing_int, &rotatationCorrection, &targetBearing,
+PID bearingPID (&bearing_int, &rotationCorrection, &targetBearing,
 	BEARING_KP, 0, BEARING_KD, -ROTATIONCORRECTION_MAX, ROTATIONCORRECTION_MAX, 1000);
 
 
@@ -93,11 +101,14 @@ int16_t backspinSpeed = 0;
 /*                       Kicker                           */
 /**********************************************************/
 #define KICK_TIME 4000
+#define KICK_MODE_KICK_TIME 15000
 #define KICK_DELAY 30
 #define KICK_DURATION 90
 
 #define KICK_SIG 21
 #define KICK_ANA A3
+
+uint16_t kickTime;
 
 bool kicking = false;
 bool kickDelayComplete = false;
@@ -214,18 +225,80 @@ void checkEndKick(){
 
 void calibIMUOffset(){
 	Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_OFFSET);
-	// for (int i = 0; i < 50; i++){
-	// 	Slave1.requestPacket(SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET);
-	// 	Slave1.receivePacket(inBuffer, 7, true);
-		
-	// 	f2b.b[0] = inBuffer[2];
-	// 	f2b.b[1] = inBuffer[3];
-	// 	f2b.b[2] = inBuffer[4];
-	// 	f2b.b[3] = inBuffer[5];
-	// 	bearing_offset += -f2b.f;
-	// 	delay(1);
-	// }
-	// bearing_offset /= 50;
+}
+
+
+void calibMag(){
+	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
+
+	Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_MAG);
+	// now we've entered calibration mode
+	tft.setCursor(0, 50);
+	tft.setTextSize(2);
+	tft.setTextColor(ILI9341_RED);
+	tft.println("entered calibration mode");
+	tft.println("tap anywhere on screen to finish calibration");
+
+	touched = false;
+	while(!touched){
+		getTouch();
+		Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_DATA);
+		Slave1.receivePacket(inBuffer, 24, true);
+
+		tft.fillRect(0, 80, 320, 180, ILI9341_BLACK);
+		tft.setCursor(0, 80);
+
+		f2b.b[0] = inBuffer[0];
+		f2b.b[1] = inBuffer[1];
+		f2b.b[2] = inBuffer[2];
+		f2b.b[3] = inBuffer[3];
+
+		tft.print(f2b.f); tft.print(" ");
+
+		f2b.b[0] = inBuffer[4];
+		f2b.b[1] = inBuffer[5];
+		f2b.b[2] = inBuffer[6];
+		f2b.b[3] = inBuffer[7];
+
+		tft.print(f2b.f); tft.print("\n");
+
+		f2b.b[0] = inBuffer[8];
+		f2b.b[1] = inBuffer[9];
+		f2b.b[2] = inBuffer[10];
+		f2b.b[3] = inBuffer[11];
+
+		tft.print(f2b.f); tft.print(" ");
+
+		f2b.b[0] = inBuffer[12];
+		f2b.b[1] = inBuffer[13];
+		f2b.b[2] = inBuffer[14];
+		f2b.b[3] = inBuffer[15];
+
+		tft.print(f2b.f); tft.print("\n");
+
+		f2b.b[0] = inBuffer[16];
+		f2b.b[1] = inBuffer[17];
+		f2b.b[2] = inBuffer[18];
+		f2b.b[3] = inBuffer[19];
+
+		tft.print(f2b.f); tft.print(" ");
+
+		f2b.b[0] = inBuffer[20];
+		f2b.b[1] = inBuffer[21];
+		f2b.b[2] = inBuffer[22];
+		f2b.b[3] = inBuffer[23];
+
+		tft.print(f2b.f); tft.print("\n");
+
+		delay(20);
+	}
+	// exit when touched
+	Slave1.requestPacket(SLAVE1_COMMANDS::END_CALIB_MAG);
+	tft.println();
+	tft.println("Calibration complete!");
+
+	initDebugTFT();
+	drawButtons();
 }
 
 void getSlave1Data(){
@@ -323,17 +396,56 @@ void checkBallInZone(){
 	}
 }
 
+void getTouch(){
+	touchedPoint = ctp.getPoint(); 
+	touched = (touchedPoint.x != 0 || touchedPoint.y != 0);
+	if (touched){
+		int x, y;
+		x = touchedPoint.y;
+		y = 240 - touchedPoint.x;
+		touchedPoint.x = x;
+		touchedPoint.y = y;
+	}
+}
+
+void drawPiLogo(){
+	tft.setRotation(3);
+	tft.fillScreen(ILI9341_BLACK);
+	tft.setTextColor(ILI9341_WHITE);
+	tft.setTextSize(4);
+	tft.println("Team PI");
+	tft.setTextSize(1);
+}
+
 void drawButtons(){
-	tft.fillRect(0, 180, 107, 240, tft.color565(50,50,50));
-	tft.fillRect(107, 180, 214, 240, tft.color565(100,100,100));
-	tft.fillRect(214, 180, 320, 240, tft.color565(150,150,150));
+	magBtn.setText("MAG", 3, ILI9341_GREEN);
+	ltBtn.setText("LT", 3, ILI9341_GREEN);
+	kickBtn.setText("KICK", 3, ILI9341_GREEN);
+
+	kickBtn.toggleBorderMode = true;
+
+	tftEnableBtn.setBounds(320 - 60, 0, 320, 60);
+	magBtn.setBounds(0, 180, 107, 240);
+	ltBtn.setBounds(107, 180, 214, 240);
+	kickBtn.setBounds(214, 180, 320, 240);
+
+
+	tftEnableBtn.setColour(ILI9341_RED);
+	magBtn.setColour(tft.color565(50,50,50));
+	ltBtn.setColour(tft.color565(100,100,100));
+	kickBtn.setColour(tft.color565(150,150,150));
+
+	tftEnableBtn.draw();
+	magBtn.draw();
+	ltBtn.draw();
+	kickBtn.draw();
 }
 
 void initDebugTFT(){
 	// tft.color565(50,50,50)
 	tft.setTextSize(1);
 
-	tft.fillRect(0, 32, 320, 180, ILI9341_BLACK);
+	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
 	//tft.fillScreen(ILI9341_BLACK);
 	tft.setCursor(0, 50);
 	tft.setTextColor(ILI9341_RED);
@@ -355,11 +467,11 @@ void initDebugTFT(){
 	tft.println("targetDir_r_field");
 	tft.println("targetVelocity");
 	tft.println("bearing");
-	tft.println("rotatationCorrection");
+	tft.println("rotationCorrection");
 
 }
 void debugTFT(){
-	tft.fillRect(160, 32, 320, 180, ILI9341_BLACK);
+	tft.fillRect(160, 32, 60, 145, ILI9341_BLACK);
 	tft.setCursor(160, 50);
 	tft.x_offset = 160;
 
@@ -383,7 +495,8 @@ void debugTFT(){
 	tft.println(targetDir_r_field);
 	tft.println(targetVelocity);
 	tft.println(bearing);
-	tft.println(rotatationCorrection);
+	tft.println(rotationCorrection);
+	tft.x_offset = 0;
 }
 
 void serialDebug(){
@@ -403,7 +516,7 @@ void serialDebug(){
 				  targetDir_r_field,
 				  targetVelocity,
 				  bearing,
-				  rotatationCorrection);
+				  rotationCorrection);
 
 	if(Serial.available()){
 		char serialCommand = Serial.read();
@@ -423,7 +536,7 @@ void serialDebug(){
 				  "ballInZone",
 				  "targetDir",
 				  "targetVelocity",
-				  "rotatationCorrection");
+				  "rotationCorrection");
 			Serial.println("PRESS ANY KEY TO CONTINUE");
 			// wait for key
 			while(!Serial.available());
@@ -447,12 +560,7 @@ extern "C" int main(void){
 
 	delay(200);
 	tft.begin();
-	tft.setRotation(3);
-	tft.fillScreen(ILI9341_BLACK);
-	tft.setTextColor(ILI9341_WHITE);
-	tft.setTextSize(4);
-	tft.println("Team PI");
-	tft.setTextSize(2);
+	drawPiLogo();
 
 	if (!ctp.begin(30)) {  // pass in 'sensitivity' coefficient
 		Serial.println("Couldn't start FT6206 touchscreen controller");
@@ -497,11 +605,31 @@ extern "C" int main(void){
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
 			case 3: srfLeft.getRangeIfCan(leftDistance); break;
 			case 4:
-				touchedPoint = ctp.getPoint(); 
-				touched = (touchedPoint.x != 0 && touchedPoint.y != 0);
+				getTouch();
+				tftEnableBtn.checkTouch();
+				ltBtn.checkTouch();
+				magBtn.checkTouch();
+				kickBtn.checkTouch();
+
+				if (tftEnableBtn.released){
+					// toggle display and touch
+					tftEnabled = !tftEnabled;
+					ltBtn.enabled = !ltBtn.enabled;
+					magBtn.enabled = !magBtn.enabled;
+					kickBtn.enabled = !kickBtn.enabled;
+				}
+				else if (magBtn.released){
+					calibMag();
+				}
+				else if (ltBtn.released){
+
+				}
+				else if (kickBtn.released){
+					kickMode = !kickMode;
+				}
+
 				break;
 		}
-		tftEnabled = touched;
 		/* orientation/imu */
 		getSlave1Data();
 		/* end orientation/imu */
@@ -563,26 +691,28 @@ extern "C" int main(void){
 			targetVelocity = 0;
 		}
 
-
-		// if (tsopAngle > 90){
-		// 	targetDir = (orbit_k * 180 - 90 + tsopAngle);
-		// }
-		// else if (tsopAngle < -90){
-		// 	targetDir = (orbit_k * -180 + 90 + tsopAngle);
-		// }
-		// else{
 		targetDir_r_field = (270 - abs(tsopAngle_r_targetBearing * orbit_k)) / 90 * tsopAngle_r_targetBearing * orbit_k;
+
 		TOBEARING180(targetDir_r_field);
 		targetDir = targetDir_r_field - bearing_int;
 		TOBEARING180(targetDir);
-		// }
+		
+		if (kickMode){
+			goalDetected = true;
+			ballInZone = true;
+			goalAngle = 0;
+			kickTime = KICK_MODE_KICK_TIME;
+		}
+		else{
+			kickTime = KICK_TIME;
+		}
 		goalDetected = true;
 		if (ballInZone && goalDetected && abs(goalAngle) < 10){
 			// GO!
 			targetDir = goalAngle;
 			targetVelocity = RAMMING_SPEED;
 			// kick!
-			if (capChargedTime > KICK_TIME){
+			if (capChargedTime > kickTime){
 				kick();
 			}
 		}
@@ -594,18 +724,24 @@ extern "C" int main(void){
 		getBackspinSpeed();
 		/* end backspin control */
 
-		Slave3.moveRobot((uint8_t)(targetDir * 255/360), targetVelocity, rotatationCorrection);
+		if (kickMode){
+			backspinSpeed = 0;
+			targetVelocity = 0;
+			rotationCorrection = 0;
+		}
+		Slave3.moveRobot((uint8_t)(targetDir * 255/360), targetVelocity, rotationCorrection);
 		Slave3.moveMotorE(backspinSpeed);
 
 		ledBlink();
 		/* debugging */
-		
-		if (loopCount % 20 == 0){
+
+		serialDebug();
+		if (loopCount % 30 == 0){
 			if (tftEnabled){
 				debugTFT();
-			}
-			serialDebug();
+			}			
 		}
+
 		/* end debugging */
 
 		loopCount++;  // update loop count
