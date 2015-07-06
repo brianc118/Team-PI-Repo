@@ -230,6 +230,10 @@ void calibIMUOffset(){
 
 
 void calibMag(){
+	// stop moving
+	Slave3.moveRobot(0, 0, 0);
+	Slave3.moveMotorE(0);
+
 	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
 
 	Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_MAG);
