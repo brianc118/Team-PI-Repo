@@ -20,8 +20,8 @@ by Brian Chen
 
  ****************************************************/
 
-#include <Adafruit_GFX.h>
-#include <Adafruit_TFTLCD.h>
+#include <SPI.h>
+#include "ILI9341_t3.h"
 #include <i2c_t3.h>      
 #include <Adafruit_FT6206.h>
 
@@ -35,14 +35,11 @@ by Brian Chen
 // The FT6206 uses hardware I2C (SCL/SDA)
 Adafruit_FT6206 ctp = Adafruit_FT6206();
 
-#define LCD_CS 15   // chip select
-#define LCD_CD 20   // command/data
-#define LCD_WR 22   // write
-#define LCD_RD 21   // read
+#define TFT_DC 22
+#define TFT_CS 20
 
-#define LCD_RESET 23
-
-Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
+// Use hardware SPI (on Uno, #13, #12, #11) and the above for CS/DC
+ILI9341_t3 tft = ILI9341_t3(TFT_CS, TFT_DC, 255, 11, 14, 12);
 
 // Size of the color selection boxes and the paintbrush size
 #define BOXSIZE 40
@@ -61,11 +58,11 @@ int oldcolor, currentcolor;
 
 void touchDetected(){
   // Retrieve a point  
-  TS_Point p = ctp.getPoint();
+  POINT p = ctp.getPoint();
 
   // flip it around to match the screen.
-  p.x = map(p.x, 0, 240, 240, 0);
-  p.y = map(p.y, 0, 320, 320, 0);
+  // p.x = map(p.x, 0, 240, 240, 0);
+  // p.y = map(p.y, 0, 320, 320, 0);
 
   // Print out the remapped (rotated) coordinates
   Serial.print("("); Serial.print(p.x);
@@ -120,9 +117,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("Cap Touch Paint!"));
 
-  tft.reset();
-  tft.begin(0x9341);
-  tft.setRotation(2);
+  tft.begin();
+  tft.setRotation(3);
   tft.fillScreen(BLACK);
   tft.setTextColor(GREEN);
   tft.setTextSize(3);
@@ -148,7 +144,7 @@ void setup() {
   currentcolor = RED;
 
   pinMode(IRQ, INPUT);
-  //attachInterrupt(IRQ, touchDetected, LOW);
+  attachInterrupt(IRQ, touchDetected, LOW);
 
   pinMode(LITE, OUTPUT);
   analogWriteResolution(12);
@@ -160,8 +156,8 @@ void loop() {
   analogWrite(LITE, (int)(1000));
   //Serial.println(digitalRead(IRQ));
   // Wait for a touch
-  if (digitalRead(IRQ) == HIGH) {
-    return;
-  }
+  // if (digitalRead(IRQ) == HIGH) {
+  //   return;
+  // }
   touchDetected();  
 }
