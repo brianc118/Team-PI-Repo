@@ -18,6 +18,8 @@
 /**********************************************************/
 /*					   General						  */
 /**********************************************************/
+
+#define DEBUG_SERIAL
 #define LED 13
 uint8_t status = 0;	 // status of program/slave
 
@@ -35,6 +37,8 @@ volatile uint8_t vbatLV, vbatHV;
 T3SPI SPI; // create SPI object
 volatile uint8_t dataOut[2];
 volatile uint8_t command = 255;
+volatile int16_t tsopAngleVol;
+volatile uint8_t tsopStrengthVol;
 
 // blink
 elapsedMillis ledElapsedTime;
@@ -42,7 +46,7 @@ elapsedMillis ledElapsedTime;
 bool ledState = true;
 uint32_t ledBlinkTime = 500;
 
-uint32_t spiRequestCount = 0;
+volatile uint32_t spiRequestCount = 0;
 uint32_t spiRequestCount_prev = 0;
 
 /**********************************************************/
@@ -64,8 +68,6 @@ IntervalTimer TSOP_ISR_Timer;
 volatile uint32_t TSOP_ISR_Count = 0;
 
 TSOPS tsops; // TSOPS object
-volatile uint8_t tsopAngleByte_vol;
-volatile uint8_t tsopStrength_vol;
 
 /* though tsops already has a member for the data, it's continuously f
    updated and incomplete this variable array stores the most recent 
@@ -90,7 +92,8 @@ int main(){
 	digitalWrite(13, LOW);
 
 	tsops.begin();	 // initialise TSOPS
-	tsops.angle = 999; // for debugging purposes, initially set angle as this
+	tsops.angle = -99; // for debugging purposes, initially set angle as this
+	tsops.strength = 150;
 
 	digitalWrite(13, LOW);
 	initBatReadings(); // initialise battery readings
@@ -154,8 +157,6 @@ inline void initSPI(){
 /* Interrupt Service Routine to handle incoming data
    For best performance, direct access to hardware SPI registers are used (instead of via lib) */
 void spi0_isr(){
-	//noInterrupts();
-	//SPIRequestTime = millis();
 	command = SPI0_POPR;
 	switch(command){
 		//case 255: command = c; SPI0_PUSHR_SLAVE = 0; break;
@@ -188,18 +189,17 @@ void spi0_isr(){
 		// case SLAVE2_COMMANDS::VBAT_REF_LV:		   SPI0_PUSHR_SLAVE = vbatLV;				 break;
 		// case SLAVE2_COMMANDS::VBAT_REF_HV:		   SPI0_PUSHR_SLAVE = vbatHV;				 break;
 		case SLAVE2_COMMANDS::TSOP_ANGLE_HIGH:	   
-			dataOut[0] = highByte(tsops.angle); 
-			dataOut[1] = lowByte(tsops.angle); 
+			dataOut[0] = highByte(tsopAngleVol); 
+			dataOut[1] = lowByte(tsopAngleVol); 
 			SPI0_PUSHR_SLAVE = dataOut[0];
 			break;
 		case SLAVE2_COMMANDS::TSOP_ANGLE_LOW:	   SPI0_PUSHR_SLAVE = dataOut[1];  break;
 		case SLAVE2_COMMANDS::TSOP_ANGLE_BYTE:	   SPI0_PUSHR_SLAVE = tsops.angleByte;	 break;
-		case SLAVE2_COMMANDS::TSOP_STRENGTH:	   SPI0_PUSHR_SLAVE = tsops.strength; 	 break;
+		case SLAVE2_COMMANDS::TSOP_STRENGTH:	   SPI0_PUSHR_SLAVE = tsopStrengthVol; 	 break;
 		default:  SPI0_PUSHR_SLAVE = 0;	break;
 	}
-	SPI0_SR |= SPI_SR_RFDF;
 	spiRequestCount++;
-	//Serial.println("command"); //interrupts();
+	SPI0_SR |= SPI_SR_RFDF;	
 }
 
 // Routine to read tsops (as well as batteries)
@@ -209,13 +209,15 @@ void TSOP_ISR(){
 		tsops.read();
 	}
 	else{
+#ifdef DEBUG_SERIAL
 		Serial.print(vbatHV);
 		Serial.print('\t');
 		Serial.print(vbatLV);
 		Serial.print('\t');
 		Serial.print(tsops.averageStrength);
 		Serial.print('\t');
-		Serial.println(tsops.angleByte * 360/180);
+		Serial.println(tsops.angle);
+#endif
 	}
 	// else, we're in a stage where we're unlocking the tsops.
 
@@ -233,7 +235,10 @@ void TSOP_ISR(){
 			tsops.filterData();
 			tsops.getStrength();
 			tsops.getAngle();
-
+			tsopAngleVol = tsops.angle;
+			tsopStrengthVol = tsops.averageStrength;
+			// tsopAngleVol = -99;
+			// tsopStrengthVol = 150;
 		}
 		// unlock tsops and read batteries. Must be a multiple of RESOLUTION!
 		if (TSOP_ISR_Count == TSOP_RESOLUTION * 50){
