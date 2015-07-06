@@ -66,9 +66,10 @@ inline void commandRequestStandardPacket();
 
 void calibIMUOffset(){
 	bearing_offset = 0;
-	for (int i = 0; i < 10000; i++){
+	for (int i = 0; i < 100; i++){
 		slave1.imu.read();
 		slave1.imu.complementaryFilterBearing(COMPCONSTANT);
+		delay(1);
 	}
 	for (int i = 0; i < 50; i++){
 		slave1.imu.read();
@@ -118,7 +119,7 @@ void calibMag(){
 	slave1.imu.initCalibMagRoutine();
 	while(Serial.available() <= 0){
 		slave1.imu.calibMagRoutine();
-		if(elpsdPrintTime > 100){
+		if(elpsdPrintTime > 1000){
 			elpsdPrintTime = 0;
 			// Serial.print(slave1.imu.mx, 6);
 			// Serial.print('\t');
