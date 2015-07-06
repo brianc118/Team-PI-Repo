@@ -29,7 +29,19 @@
 
 #define LED 13
 
-#define COMPCONSTANT 0.9
+// the higher the value of COMPCONSTANT, the more gyro data is used
+// COMPCONSTANT = t/(t+T) where t is the 't' is the time constant and T is the sample period
+// the time constant is essentially how long we should keep the gyro data for before magnetometer data overules
+#define COMPCONSTANT 0.995
+
+#define INDEX1 1
+#define INDEX2 2
+#define INDEX3 4
+#define INDEX4 8
+#define INDEX5 16
+#define INDEX6 32
+#define INDEX7 64
+#define INDEX8 128
 
 union float2bytes { float f; uint8_t b[sizeof(float)]; };
 float2bytes f2b;
@@ -45,6 +57,9 @@ float bearing = 0;
 float bearing_offset = 0;
 
 uint8_t outBuffer[22] = {0};
+
+uint8_t frontSum, backSum, rightSum, leftSum;
+uint8_t lightByte = 0x00;
 
 inline void commandRequestStandardPacket();
 
@@ -123,7 +138,19 @@ void calibMag(){
 	CLEARSERIAL();
 }
 
-int main(void){	
+void calibMagRequest(){
+	slave1.imu.initCalibMagRoutine();
+	uint8_t c = 0;
+	while(c != SLAVE1_COMMANDS::END_CALIB_MAG){
+		slave1.imu.calibMagRoutine();
+		c = slave1.checkIfRequested();
+	}
+	// store mag calibration in EEPROM
+	slave1.imu.storeMagCalibrations();
+	slave1.imu.preCalculateCalibParams();
+}
+
+extern "C" int main(void){	
 	Serial.begin(115200);
 	pinMode(LED, OUTPUT);
 
@@ -170,23 +197,27 @@ int main(void){
 		slave1.imu.read();
 		slave1.imu.complementaryFilterBearing(COMPCONSTANT);
 		bearing = -slave1.imu.yaw;
+		// Serial.print(micros());
+		// Serial.print('\t');
+		// Serial.print(bearing, 2);
+
 		bearing = bearing - bearing_offset;
 		TOBEARING180(bearing);		
 
+		// Serial.print('\t');
+		// Serial.println(bearing, 2);
 		
 		// Serial.print(slave1.imu.mx, 2);
 		// Serial.print('\t');
 		// Serial.print(slave1.imu.my, 2);
 		// Serial.print('\t');
-		Serial.print(micros());
-		Serial.print('\t');
-		Serial.println(bearing, 2);
+		
 		
 		slave1.lightArray.read();
 		slave1.lightArray.getColours();
 		// Serial.println();
-		// PRINTARRAY(slave1.lightArray.lightData);
-		// PRINTARRAY(slave1.lightArray.colours);
+		PRINTARRAY(slave1.lightArray.lightData);
+		PRINTARRAY(slave1.lightArray.colours);
 		// Serial.print(slave1.lightArray.armFrontSum);
 		// Serial.print('\t');
 		// Serial.print(slave1.lightArray.armBackSum);
@@ -196,6 +227,93 @@ int main(void){
 		// Serial.println(slave1.lightArray.armLeftSum);
 		// Serial.println(bearing, 2);
 
+		lightByte = 0x00;
+
+		// now lightbyte is one of 16 possible values
+		if (abs(bearing) <= 45){
+			// we're facing forwards
+			frontSum = slave1.lightArray.armFrontSum;
+			backSum  = slave1.lightArray.armBackSum;
+			rightSum = slave1.lightArray.armFrontSum;
+			leftSum  = slave1.lightArray.armBackSum;
+		}
+		else if (bearing > 45 && bearing <= 135){
+			// facing right
+			rightSum = slave1.lightArray.armFrontSum;
+			leftSum  = slave1.lightArray.armBackSum;
+			backSum  = slave1.lightArray.armFrontSum;
+			frontSum = slave1.lightArray.armBackSum;
+		}
+		else if (bearing < -45  && bearing >= -135){
+			// facing left
+			leftSum = slave1.lightArray.armFrontSum;
+			rightSum  = slave1.lightArray.armBackSum;
+			frontSum = slave1.lightArray.armFrontSum;
+			backSum  = slave1.lightArray.armBackSum;
+		}
+		else{
+			// facing back
+			backSum   = slave1.lightArray.armFrontSum;
+			frontSum = slave1.lightArray.armBackSum;
+			leftSum   = slave1.lightArray.armFrontSum;
+			rightSum = slave1.lightArray.armBackSum;
+		}
+
+		if (frontSum) lightByte = lightByte | INDEX1;
+		if (backSum)  lightByte = lightByte | INDEX2;
+		if (rightSum) lightByte = lightByte | INDEX3;
+		if (leftSum)  lightByte = lightByte | INDEX4;
+		
+		Serial.println(lightByte, BIN);
+		switch (lightByte){
+			case 0: /*nothing*/ 
+				break;
+			case 1: /*front*/ 
+				slave1.lineLocation = LINELOCATION::SIDE_TOP;
+				break;
+			case 2: /*back*/ 
+				slave1.lineLocation = LINELOCATION::SIDE_BOTTOM;
+				break;
+			case 3: /*front back*/ 
+				slave1.lineLocation = LINELOCATION::UNKNOWN;
+				break;
+			case 4: /*right*/ 
+				slave1.lineLocation = LINELOCATION::SIDE_RIGHT;
+				break;
+			case 5: /*front right*/ 
+				slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
+				break;
+			case 6: /*back right*/
+				slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_RIGHT;
+				break;
+			case 7: /*front back right*/ 
+				slave1.lineLocation = LINELOCATION::UNKNOWN;
+				break;
+			case 8: /*left*/ 
+				slave1.lineLocation = LINELOCATION::SIDE_LEFT;
+				break;
+			case 9: /*front left*/ 
+				slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
+				break;
+			case 10: /*back left*/
+				slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_LEFT;
+				break;
+			case 11: /*front back left*/ 
+				slave1.lineLocation = LINELOCATION::UNKNOWN;
+				break;
+			case 12: /*right left*/ 
+				slave1.lineLocation = LINELOCATION::UNKNOWN;
+				break;
+			case 13: /*front right left*/ 
+				slave1.lineLocation = LINELOCATION::UNKNOWN;
+				break;
+			case 14: /*back right left*/ 
+				slave1.lineLocation = LINELOCATION::UNKNOWN;
+				break;
+			case 15: /*front back right left*/ 
+				slave1.lineLocation = LINELOCATION::UNKNOWN;
+				break;
+		}
 		// Serial.println();
 		// PRINTARRAY(slave1.lightArray.lightData);
 		// PRINTARRAY(slave1.lightArray.colours);
@@ -214,7 +332,12 @@ int main(void){
 	    		case SLAVE1_COMMANDS::REQUEST_STANDARD_PACKET:
 	    			commandRequestStandardPacket();
 	    			break;
+	    		case SLAVE1_COMMANDS::CALIB_MAG:
+	    			calibMagRequest(); // note that for this command another END_CALIB_MAG command must be sent to finish
+	    			break;
 	    		case 255:
+	    			break;
+	    		default:
 	    			break;
 	    	}
 		}
@@ -245,7 +368,7 @@ int main(void){
 inline void commandRequestStandardPacket(){
 	slave1.x = 20;
 	slave1.y = 30;
-	slave1.lineLocation = LINELOCATION::RECT_TOP;
+
 	f2b.f = bearing;
 	// Serial.print("sending");
 	// Serial.println(bearing);
