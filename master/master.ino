@@ -564,7 +564,7 @@ extern "C" int main(void){
 	SPI.setSCK(14);
 	SPI.begin();	
 
-	delay(200);
+	delay(1000);
 	tft.begin();
 	drawPiLogo();
 
@@ -593,7 +593,7 @@ extern "C" int main(void){
 
 	digitalWrite(LED, HIGH);
 
-	delay(800);
+	//delay(800);
 	tft.println("Calibrating IMU offset");
 	calibIMUOffset();
 	
