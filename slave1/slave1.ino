@@ -56,7 +56,7 @@ elapsedMillis SerialRequestTime;
 float bearing = 0;
 float bearing_offset = 0;
 
-uint8_t outBuffer[22] = {0};
+uint8_t outBuffer[24] = {0};
 
 uint8_t frontSum, backSum, rightSum, leftSum;
 uint8_t lightByte = 0x00;
@@ -139,12 +139,24 @@ void calibMag(){
 }
 
 void calibMagRequest(){
+	Serial.println("calibMagRequest");
 	slave1.imu.initCalibMagRoutine();
-	uint8_t c = 0;
-	while(c != SLAVE1_COMMANDS::END_CALIB_MAG){
+	bool exit = false;
+	while(!exit){
 		slave1.imu.calibMagRoutine();
-		c = slave1.checkIfRequested();
+		uint8_t c = slave1.checkIfRequested();
+		switch(c){
+			case SLAVE1_COMMANDS::END_CALIB_MAG:
+				exit = true;
+				break;
+			case SLAVE1_COMMANDS::CALIB_DATA:
+				commandRequestCalibData();
+				Serial.println("sent data");
+				break;
+			case 255: break;
+		}
 	}
+	Serial.println("ended mag calib");
 	// store mag calibration in EEPROM
 	slave1.imu.storeMagCalibrations();
 	slave1.imu.preCalculateCalibParams();
@@ -365,6 +377,40 @@ extern "C" int main(void){
 	}
 }
 
+inline void commandRequestCalibData(){
+	f2b.f = slave1.imu.mx;
+	outBuffer[0] = f2b.b[0];
+	outBuffer[1] = f2b.b[1];
+	outBuffer[2] = f2b.b[2];
+	outBuffer[3] = f2b.b[3];
+	f2b.f = slave1.imu.my;
+	outBuffer[4] = f2b.b[0];
+	outBuffer[5] = f2b.b[1];
+	outBuffer[6] = f2b.b[2];
+	outBuffer[7] = f2b.b[3];
+	f2b.f = slave1.imu.MagMinX;
+	outBuffer[8] = f2b.b[0];
+	outBuffer[9] = f2b.b[1];
+	outBuffer[10] = f2b.b[2];
+	outBuffer[11] = f2b.b[3];
+	f2b.f = slave1.imu.MagMaxX;
+	outBuffer[12] = f2b.b[0];
+	outBuffer[13] = f2b.b[1];
+	outBuffer[14] = f2b.b[2];
+	outBuffer[15] = f2b.b[3];
+	f2b.f = slave1.imu.MagMinY;
+	outBuffer[16] = f2b.b[0];
+	outBuffer[17] = f2b.b[1];
+	outBuffer[18] = f2b.b[2];
+	outBuffer[19] = f2b.b[3];
+	f2b.f = slave1.imu.MagMaxY;
+	outBuffer[20] = f2b.b[0];
+	outBuffer[21] = f2b.b[1];
+	outBuffer[22] = f2b.b[2];
+	outBuffer[23] = f2b.b[3];
+
+	slave1.sendPacket(outBuffer, 24);
+}
 inline void commandRequestStandardPacket(){
 	slave1.x = 20;
 	slave1.y = 30;
