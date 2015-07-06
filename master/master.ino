@@ -11,6 +11,7 @@
 #include <i2c_t3.h>
 #include <SPI.h>
 #include <ILI9341_t3.h>
+#include <Adafruit_FT6206.h>
 #include <slaves.h>
 #include <piCommon.h>
 #include <PixyI2C.h> // modified for i2c_t3
@@ -34,6 +35,21 @@ elapsedMillis ledElapsedTime;
 bool ledState = true;
 uint32_t ledBlinkTime = 500;
 
+
+/**********************************************************/
+/*					      tft   						  */
+/**********************************************************/
+#define TFT_DC 22
+#define TFT_CS 20
+
+bool tftEnabled = true;
+
+ILI9341_t3 tft = ILI9341_t3(TFT_CS, TFT_DC, 255, 11, 14, 12);
+
+Adafruit_FT6206 ctp = Adafruit_FT6206();
+
+bool touched = false;
+POINT touchedPoint;
 
 /**********************************************************/
 /*					     Slave1   						  */
@@ -102,7 +118,7 @@ PixyI2C pixy1(PIXY1_ADDRESS);
 int16_t blocks = 0;
 
 int16_t goalAngle = 0;
-int16_t goalAngle_rel_field = 0;
+int16_t goalAngle_r_field = 0;
 uint16_t goalArea = 0;
 
 elapsedMillis lGoalDetectTime = 0;
@@ -251,7 +267,7 @@ void getGoalData(){
 		goalAngle = -bearing_int;
 	}
 
-	goalAngle_rel_field = goalAngle + bearing_int;
+	goalAngle_r_field = goalAngle + bearing_int;
 }
 
 void getBackspinSpeed(){
@@ -307,11 +323,74 @@ void checkBallInZone(){
 	}
 }
 
+void drawButtons(){
+	tft.fillRect(0, 180, 107, 240, tft.color565(50,50,50));
+	tft.fillRect(107, 180, 214, 240, tft.color565(100,100,100));
+	tft.fillRect(214, 180, 320, 240, tft.color565(150,150,150));
+}
+
+void initDebugTFT(){
+	// tft.color565(50,50,50)
+	tft.setTextSize(1);
+
+	tft.fillRect(0, 32, 320, 180, ILI9341_BLACK);
+	//tft.fillScreen(ILI9341_BLACK);
+	tft.setCursor(0, 50);
+	tft.setTextColor(ILI9341_RED);
+	tft.println("micros");
+	tft.setTextColor(ILI9341_YELLOW);
+	tft.println("goalAngle_r_field");
+	tft.println("goalArea");
+	tft.setTextColor(ILI9341_MAGENTA);
+	tft.println("backDistance");
+	tft.println("rightDistance");
+	tft.println("leftDistance");
+	tft.setTextColor(ILI9341_WHITE);
+	tft.println("tsopAngle");
+	tft.println("tsopAngle_r_targetBearing");
+	tft.println("tsopStrength");
+	tft.setTextColor(ILI9341_GREEN);
+	tft.println("ballInZone");
+	tft.println("targetDir");
+	tft.println("targetDir_r_field");
+	tft.println("targetVelocity");
+	tft.println("bearing");
+	tft.println("rotatationCorrection");
+
+}
+void debugTFT(){
+	tft.fillRect(160, 32, 320, 180, ILI9341_BLACK);
+	tft.setCursor(160, 50);
+	tft.x_offset = 160;
+
+	tft.setTextColor(ILI9341_RED);
+	tft.setTextSize(1);
+	tft.println(micros());
+	tft.setTextColor(ILI9341_YELLOW);
+	tft.println(goalAngle_r_field);
+	tft.println(goalArea);
+	tft.setTextColor(ILI9341_MAGENTA);
+	tft.println(backDistance);
+	tft.println(rightDistance);
+	tft.println(leftDistance);
+	tft.setTextColor(ILI9341_WHITE);
+	tft.println(tsopAngle);
+	tft.println(tsopAngle_r_targetBearing);
+	tft.println(tsopStrength);
+	tft.setTextColor(ILI9341_GREEN);
+	tft.println(ballInZone);
+	tft.println(targetDir);
+	tft.println(targetDir_r_field);
+	tft.println(targetVelocity);
+	tft.println(bearing);
+	tft.println(rotatationCorrection);
+}
+
 void serialDebug(){
 #ifdef DEBUG_SERIAL
 	Serial.printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%.0f\t%d\n",
 				  micros(),
-				  goalAngle_rel_field,
+				  goalAngle_r_field,
 				  goalArea,
 				  backDistance,
 				  rightDistance,
@@ -333,7 +412,7 @@ void serialDebug(){
 			Serial.println("DEBUG INFO");
 			Serial.printf("%s %s %s %s %s %s %s %s %s %s %s %s %s %s \n",
 				  "micros()",
-				  "goalAngle_rel_field",
+				  "goalAngle_r_field",
 				  "goalArea",
 				  "bearing",
 				  "backDistance",
@@ -366,9 +445,29 @@ extern "C" int main(void){
 	SPI.setSCK(14);
 	SPI.begin();	
 
+	delay(200);
+	tft.begin();
+	tft.setRotation(3);
+	tft.fillScreen(ILI9341_BLACK);
+	tft.setTextColor(ILI9341_WHITE);
+	tft.setTextSize(4);
+	tft.println("Team PI");
+	tft.setTextSize(2);
+
+	if (!ctp.begin(30)) {  // pass in 'sensitivity' coefficient
+		Serial.println("Couldn't start FT6206 touchscreen controller");
+		tft.println("Couldn't start FT6206 touchscreen controller");
+	}
+	else{
+		Serial.println("Couldn't start FT6206 touchscreen controller");
+		tft.println("FT6206 connected");
+	}
+
 	Slave1.begin(115200);
 	Slave2.begin();
 	Slave3.begin();
+	Serial.println("Slaves connected");
+	tft.println("Slaves connected");
 
 	pinMode(LED, OUTPUT);
 	pinMode(LASER_SIG, INPUT);
@@ -380,20 +479,29 @@ extern "C" int main(void){
 
 	digitalWrite(LED, HIGH);
 
-	delay(1000);
-	
+	delay(800);
+	tft.println("Calibrating IMU offset");
 	calibIMUOffset();
+	
+	initDebugTFT();
+	drawButtons();
+
 
 	while(1){		
 		// save some time here as reading srf08's has seen to dramatically decrease performance
-		switch(loopCount % 4){
+		switch(loopCount % 5){
 #ifdef PIXY_ENABLED
 			case 0: blocks = pixy1.getBlocks(); break;
 #endif
 			case 1: srfBack.getRangeIfCan(backDistance); break;
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
 			case 3: srfLeft.getRangeIfCan(leftDistance); break;
+			case 4:
+				touchedPoint = ctp.getPoint(); 
+				touched = (touchedPoint.x != 0 && touchedPoint.y != 0);
+				break;
 		}
+		tftEnabled = touched;
 		/* orientation/imu */
 		getSlave1Data();
 		/* end orientation/imu */
@@ -409,10 +517,15 @@ extern "C" int main(void){
 		/* end goal detection */
 
 		/* face forwards */
-		targetBearing = goalAngle_rel_field; // always face goals
+		targetBearing = goalAngle_r_field; // always face goals
 		tsopAngle_r_targetBearing = tsopAngle_r_field - targetBearing; // target bearing is relative to field
 		TOBEARING180(tsopAngle_r_targetBearing);
-		bearingPID.update();
+
+		// only try to face forwards if solenoid isn't in use
+		// otherwise solenoid interfers a lot with magnetometer
+		if (!kicking){
+			bearingPID.update();
+		}
 		/* end face forwards */
 
 		/* ball in zone */
@@ -486,7 +599,13 @@ extern "C" int main(void){
 
 		ledBlink();
 		/* debugging */
-		serialDebug();
+		
+		if (loopCount % 20 == 0){
+			if (tftEnabled){
+				debugTFT();
+			}
+			serialDebug();
+		}
 		/* end debugging */
 
 		loopCount++;  // update loop count
