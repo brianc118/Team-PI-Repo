@@ -242,7 +242,9 @@ void calibMag(){
 	tft.setTextSize(2);
 	tft.setTextColor(ILI9341_RED);
 	tft.println("entered calibration mode");
-	tft.println("tap anywhere on screen to finish calibration");
+	tft.println("tap anywhere on screen to");
+	tft.println("finish calibration");
+	tft.println();
 
 	touched = false;
 	while(!touched){
@@ -454,7 +456,7 @@ void initDebugTFT(){
 
 	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
 	//tft.fillScreen(ILI9341_BLACK);
-	tft.setCursor(0, 50);
+	tft.setCursor(0, 40);
 	tft.setTextColor(ILI9341_RED);
 	tft.println("micros");
 	tft.setTextColor(ILI9341_YELLOW);
