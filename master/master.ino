@@ -173,6 +173,8 @@ uint8_t tsopData[24] = {0};
 #define LASER_SIG A1
 #define LASER_REF 152
 
+int laserSig = 0;
+
 bool ballInZone = false;
 
 inline void ledBlink(){
@@ -398,7 +400,8 @@ void getBackspinSpeed(){
 }
 
 void checkBallInZone(){
-	if (analogRead(LASER_SIG) < LASER_REF 
+	laserSig = analogRead(LASER_SIG);
+	if (laserSig < LASER_REF 
 	 && abs(tsopAngle) < 30
 	 && tsopStrength > 150){
 		ballInZone = true;
@@ -508,7 +511,7 @@ void debugTFT(){
 	tft.println(tsopAngle_r_targetBearing);
 	tft.println(tsopStrength);
 	tft.setTextColor(ILI9341_GREEN);
-	tft.println(ballInZone);
+	tft.print(ballInZone); tft.print(" "); tft.println(laserSig);
 	tft.println(targetDir);
 	tft.println(targetDir_r_field);
 	tft.println(targetVelocity);
