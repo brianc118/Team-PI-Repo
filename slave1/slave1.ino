@@ -144,6 +144,7 @@ void calibMagRequest(){
 	slave1.imu.initCalibMagRoutine();
 	bool exit = false;
 	while(!exit){
+		Serial.println("calibMagfromMaster");
 		slave1.imu.calibMagRoutine();
 		uint8_t c = slave1.checkIfRequested();
 		switch(c){
