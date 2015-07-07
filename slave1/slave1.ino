@@ -163,6 +163,95 @@ void calibMagRequest(){
 	slave1.imu.preCalculateCalibParams();
 }
 
+void lightCalcs(){
+	lightByte = 0x00;
+
+	// now lightbyte is one of 16 possible values
+	if (abs(bearing) <= 45){
+		// we're facing forwards
+		frontSum = slave1.lightArray.armFrontSum;
+		backSum  = slave1.lightArray.armBackSum;
+		rightSum = slave1.lightArray.armFrontSum;
+		leftSum  = slave1.lightArray.armBackSum;
+	}
+	else if (bearing > 45 && bearing <= 135){
+		// facing right
+		rightSum = slave1.lightArray.armFrontSum;
+		leftSum  = slave1.lightArray.armBackSum;
+		backSum  = slave1.lightArray.armFrontSum;
+		frontSum = slave1.lightArray.armBackSum;
+	}
+	else if (bearing < -45  && bearing >= -135){
+		// facing left
+		leftSum = slave1.lightArray.armFrontSum;
+		rightSum  = slave1.lightArray.armBackSum;
+		frontSum = slave1.lightArray.armFrontSum;
+		backSum  = slave1.lightArray.armBackSum;
+	}
+	else{
+		// facing back
+		backSum   = slave1.lightArray.armFrontSum;
+		frontSum = slave1.lightArray.armBackSum;
+		leftSum   = slave1.lightArray.armFrontSum;
+		rightSum = slave1.lightArray.armBackSum;
+	}
+
+	if (frontSum) lightByte = lightByte | INDEX1;
+	if (backSum)  lightByte = lightByte | INDEX2;
+	if (rightSum) lightByte = lightByte | INDEX3;
+	if (leftSum)  lightByte = lightByte | INDEX4;
+	
+	Serial.println(lightByte, BIN);
+	switch (lightByte){
+		case 0: /*nothing*/ 
+			break;
+		case 1: /*front*/ 
+			slave1.lineLocation = LINELOCATION::SIDE_TOP;
+			break;
+		case 2: /*back*/ 
+			slave1.lineLocation = LINELOCATION::SIDE_BOTTOM;
+			break;
+		case 3: /*front back*/ 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+		case 4: /*right*/ 
+			slave1.lineLocation = LINELOCATION::SIDE_RIGHT;
+			break;
+		case 5: /*front right*/ 
+			slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
+			break;
+		case 6: /*back right*/
+			slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_RIGHT;
+			break;
+		case 7: /*front back right*/ 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+		case 8: /*left*/ 
+			slave1.lineLocation = LINELOCATION::SIDE_LEFT;
+			break;
+		case 9: /*front left*/ 
+			slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
+			break;
+		case 10: /*back left*/
+			slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_LEFT;
+			break;
+		case 11: /*front back left*/ 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+		case 12: /*right left*/ 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+		case 13: /*front right left*/ 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+		case 14: /*back right left*/ 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+		case 15: /*front back right left*/ 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+	}
+}
 extern "C" int main(void){	
 	Serial.begin(115200);
 	pinMode(LED, OUTPUT);
@@ -217,119 +306,12 @@ extern "C" int main(void){
 		bearing = bearing - bearing_offset;
 		TOBEARING180(bearing);		
 
-		// Serial.print('\t');
-		// Serial.println(bearing, 2);
-		
-		// Serial.print(slave1.imu.mx, 2);
-		// Serial.print('\t');
-		// Serial.print(slave1.imu.my, 2);
-		// Serial.print('\t');
-		
 		
 		slave1.lightArray.read();
 		slave1.lightArray.getColours();
 		// Serial.println();
 		PRINTARRAY(slave1.lightArray.lightData);
 		PRINTARRAY(slave1.lightArray.colours);
-		// Serial.print(slave1.lightArray.armFrontSum);
-		// Serial.print('\t');
-		// Serial.print(slave1.lightArray.armBackSum);
-		// Serial.print('\t');
-		// Serial.print(slave1.lightArray.armRightSum);
-		// Serial.print('\t');
-		// Serial.println(slave1.lightArray.armLeftSum);
-		// Serial.println(bearing, 2);
-
-		lightByte = 0x00;
-
-		// now lightbyte is one of 16 possible values
-		if (abs(bearing) <= 45){
-			// we're facing forwards
-			frontSum = slave1.lightArray.armFrontSum;
-			backSum  = slave1.lightArray.armBackSum;
-			rightSum = slave1.lightArray.armFrontSum;
-			leftSum  = slave1.lightArray.armBackSum;
-		}
-		else if (bearing > 45 && bearing <= 135){
-			// facing right
-			rightSum = slave1.lightArray.armFrontSum;
-			leftSum  = slave1.lightArray.armBackSum;
-			backSum  = slave1.lightArray.armFrontSum;
-			frontSum = slave1.lightArray.armBackSum;
-		}
-		else if (bearing < -45  && bearing >= -135){
-			// facing left
-			leftSum = slave1.lightArray.armFrontSum;
-			rightSum  = slave1.lightArray.armBackSum;
-			frontSum = slave1.lightArray.armFrontSum;
-			backSum  = slave1.lightArray.armBackSum;
-		}
-		else{
-			// facing back
-			backSum   = slave1.lightArray.armFrontSum;
-			frontSum = slave1.lightArray.armBackSum;
-			leftSum   = slave1.lightArray.armFrontSum;
-			rightSum = slave1.lightArray.armBackSum;
-		}
-
-		if (frontSum) lightByte = lightByte | INDEX1;
-		if (backSum)  lightByte = lightByte | INDEX2;
-		if (rightSum) lightByte = lightByte | INDEX3;
-		if (leftSum)  lightByte = lightByte | INDEX4;
-		
-		Serial.println(lightByte, BIN);
-		switch (lightByte){
-			case 0: /*nothing*/ 
-				break;
-			case 1: /*front*/ 
-				slave1.lineLocation = LINELOCATION::SIDE_TOP;
-				break;
-			case 2: /*back*/ 
-				slave1.lineLocation = LINELOCATION::SIDE_BOTTOM;
-				break;
-			case 3: /*front back*/ 
-				slave1.lineLocation = LINELOCATION::UNKNOWN;
-				break;
-			case 4: /*right*/ 
-				slave1.lineLocation = LINELOCATION::SIDE_RIGHT;
-				break;
-			case 5: /*front right*/ 
-				slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
-				break;
-			case 6: /*back right*/
-				slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_RIGHT;
-				break;
-			case 7: /*front back right*/ 
-				slave1.lineLocation = LINELOCATION::UNKNOWN;
-				break;
-			case 8: /*left*/ 
-				slave1.lineLocation = LINELOCATION::SIDE_LEFT;
-				break;
-			case 9: /*front left*/ 
-				slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
-				break;
-			case 10: /*back left*/
-				slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_LEFT;
-				break;
-			case 11: /*front back left*/ 
-				slave1.lineLocation = LINELOCATION::UNKNOWN;
-				break;
-			case 12: /*right left*/ 
-				slave1.lineLocation = LINELOCATION::UNKNOWN;
-				break;
-			case 13: /*front right left*/ 
-				slave1.lineLocation = LINELOCATION::UNKNOWN;
-				break;
-			case 14: /*back right left*/ 
-				slave1.lineLocation = LINELOCATION::UNKNOWN;
-				break;
-			case 15: /*front back right left*/ 
-				slave1.lineLocation = LINELOCATION::UNKNOWN;
-				break;
-		}
-		// Serial.println();
-		// PRINTARRAY(slave1.lightArray.lightData);
-		// PRINTARRAY(slave1.lightArray.colours);
 		
 		uint8_t command = slave1.checkIfRequested();
 
