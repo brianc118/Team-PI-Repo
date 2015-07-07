@@ -492,7 +492,8 @@ void initDebugTFT(){
 	tft.println("linelocation");
 }
 void debugTFT(){
-	tft.fillRect(160, 32, 60, 145, ILI9341_BLACK);
+	tft.invertDisplay(false);
+	tft.fillRect(160, 32, 54, 145, ILI9341_BLACK);
 	tft.setCursor(160, 40);
 	tft.x_offset = 160;
 
