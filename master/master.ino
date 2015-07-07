@@ -56,6 +56,7 @@ BUTTON tftEnableBtn(&tft, &touchedPoint);
 BUTTON magBtn(&tft, &touchedPoint);
 BUTTON ltBtn(&tft, &touchedPoint);
 BUTTON kickBtn(&tft, &touchedPoint);
+BUTTON spinBtn(&tft, &touchedPoint);
 
 bool kickMode = false;
 
@@ -96,6 +97,8 @@ PID bearingPID (&bearing_int, &rotationCorrection, &targetBearing,
 /**********************************************************/
 /*                      Backspin                          */
 /**********************************************************/
+bool spinMode = false; // spinMode triggers constant backspin
+
 int16_t backspinSpeed = 0;
 
 /**********************************************************/
@@ -430,24 +433,29 @@ void drawButtons(){
 	magBtn.setText("MAG", 3, ILI9341_GREEN);
 	ltBtn.setText("LT", 3, ILI9341_GREEN);
 	kickBtn.setText("KICK", 3, ILI9341_GREEN);
+	spinBtn.setText("SPIN", 3, ILI9341_GREEN);
 
 	kickBtn.toggleBorderMode = true;
+	spinBtn.toggleBorderMode = true;
 
 	tftEnableBtn.setBounds(320 - 60, 0, 320, 60);
 	magBtn.setBounds(0, 180, 107, 240);
 	ltBtn.setBounds(107, 180, 214, 240);
 	kickBtn.setBounds(214, 180, 320, 240);
+	spinBtn.setBounds(214, 120, 320, 180);
 
 
 	tftEnableBtn.setColour(ILI9341_RED);
 	magBtn.setColour(tft.color565(50,50,50));
 	ltBtn.setColour(tft.color565(100,100,100));
 	kickBtn.setColour(tft.color565(150,150,150));
+	spinBtn.setColour(tft.color565(75,75,75));
 
 	tftEnableBtn.draw();
 	magBtn.draw();
 	ltBtn.draw();
 	kickBtn.draw();
+	spinBtn.draw();
 }
 
 void initDebugTFT(){
@@ -622,6 +630,7 @@ extern "C" int main(void){
 				ltBtn.checkTouch();
 				magBtn.checkTouch();
 				kickBtn.checkTouch();
+				spinBtn.checkTouch();
 
 				if (tftEnableBtn.released){
 					// toggle display and touch
@@ -638,6 +647,14 @@ extern "C" int main(void){
 				}
 				else if (kickBtn.released){
 					kickMode = !kickMode;
+					if (kickMode){
+						ltBtn.enabled = false;
+						magBtn.enabled = false;
+					}
+				}
+				else if (spinBtn.released){
+					spinMode = !spinMode;
+					kickBtn.enabled = false;
 				}
 
 				break;
@@ -740,6 +757,9 @@ extern "C" int main(void){
 			backspinSpeed = 0;
 			targetVelocity = 0;
 			rotationCorrection = 0;
+		}
+		if (spinMode){
+			backspinSpeed = 255;
 		}
 		Slave3.moveRobot((uint8_t)(targetDir * 255/360), targetVelocity, rotationCorrection);
 		Slave3.moveMotorE(backspinSpeed);
