@@ -189,7 +189,7 @@ elapsedMillis ledElapsedTime;
 bool ledState = true;
 uint32_t ledBlinkTime = 500;
 
-int main(void){
+extern "C" int main(void){
 	CORE_PIN33_CONFIG = 0;  // completely disables the pin
 	noInterrupts();
 	Serial.begin(115200);
@@ -554,6 +554,12 @@ void encoderUpdate(){
 			encoderUpdateCount = 0;
 			if (spiRequestCount == spiRequestCount_prev){
 				ledBlinkTime = 30;
+				// make sure robot doesn't go crazy when master crashes
+				pA = 0;
+				pB = 0;
+				pC = 0;
+				pD = 0;
+				pE = 0;
 			}
 			else{
 				ledBlinkTime = 500;
