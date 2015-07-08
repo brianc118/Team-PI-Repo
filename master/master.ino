@@ -25,8 +25,8 @@
  
 #define LED 13
 
-#define RAMMING_SPEED 0
-#define NORMAL_SPEED 0
+#define RAMMING_SPEED 200
+#define NORMAL_SPEED 150
 
 uint32_t loopCount = 0;
 
