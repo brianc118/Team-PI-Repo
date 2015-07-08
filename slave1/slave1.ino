@@ -172,37 +172,37 @@ void lightCalcs(){
 		// we're facing forwards
 		frontSum = slave1.lightArray.armFrontSum;
 		backSum  = slave1.lightArray.armBackSum;
-		rightSum = slave1.lightArray.armFrontSum;
-		leftSum  = slave1.lightArray.armBackSum;
+		rightSum = slave1.lightArray.armRightSum;
+		leftSum  = slave1.lightArray.armLeftSum;
 	}
 	else if (bearing > 45 && bearing <= 135){
 		// facing right
 		rightSum = slave1.lightArray.armFrontSum;
 		leftSum  = slave1.lightArray.armBackSum;
-		backSum  = slave1.lightArray.armFrontSum;
-		frontSum = slave1.lightArray.armBackSum;
+		backSum  = slave1.lightArray.armRightSum;
+		frontSum = slave1.lightArray.armLeftSum;
 	}
 	else if (bearing < -45  && bearing >= -135){
 		// facing left
 		leftSum = slave1.lightArray.armFrontSum;
 		rightSum  = slave1.lightArray.armBackSum;
-		frontSum = slave1.lightArray.armFrontSum;
-		backSum  = slave1.lightArray.armBackSum;
+		frontSum = slave1.lightArray.armRightSum;
+		backSum  = slave1.lightArray.armLeftSum;
 	}
 	else{
 		// facing back
 		backSum   = slave1.lightArray.armFrontSum;
 		frontSum = slave1.lightArray.armBackSum;
-		leftSum   = slave1.lightArray.armFrontSum;
-		rightSum = slave1.lightArray.armBackSum;
+		leftSum   = slave1.lightArray.armRightSum;
+		rightSum = slave1.lightArray.armLeftSum;
 	}
 
-	if (frontSum) lightByte = lightByte | INDEX1;
-	if (backSum)  lightByte = lightByte | INDEX2;
-	if (rightSum) lightByte = lightByte | INDEX3;
-	if (leftSum)  lightByte = lightByte | INDEX4;
+	if (frontSum > 0){ lightByte = lightByte | INDEX1; Serial.print('f');  }
+	if (backSum > 0){  lightByte = lightByte | INDEX2; Serial.print('b');  } 
+	if (rightSum > 0){ lightByte = lightByte | INDEX3; Serial.print('r');  }
+	if (leftSum > 0){  lightByte = lightByte | INDEX4; Serial.print('l');}
+	Serial.println();
 	
-	Serial.println(lightByte, BIN);
 	switch (lightByte){
 		case 0: /*nothing*/ 
 			break;
@@ -254,6 +254,8 @@ void lightCalcs(){
 	}
 }
 extern "C" int main(void){	
+	CORE_PIN33_CONFIG = 0;  // completely disables the pin
+
 	Serial.begin(115200);
 	pinMode(LED, OUTPUT);
 
@@ -311,8 +313,9 @@ extern "C" int main(void){
 		slave1.lightArray.read();
 		slave1.lightArray.getColours();
 		// Serial.println();
-		PRINTARRAY(slave1.lightArray.lightData);
-		PRINTARRAY(slave1.lightArray.colours);
+		
+
+		
 		
 		uint8_t command = slave1.checkIfRequested();
 
@@ -330,6 +333,30 @@ extern "C" int main(void){
 	    			break;
 	    		case SLAVE1_COMMANDS::CALIB_MAG:
 	    			calibMagRequest(); // note that for this command another END_CALIB_MAG command must be sent to finish
+	    			break;
+	    		case SLAVE1_COMMANDS::CALIB_GREEN:
+	    			slave1.lightArray.calibGreen();
+	    			break;
+	    		case SLAVE1_COMMANDS::CALIB_WHITE:
+	    			slave1.lightArray.calibWhite();
+	    			break;
+	    		case SLAVE1_COMMANDS::END_CALIB_LIGHT:
+	    			slave1.lightArray.endCalib();
+	    			break;
+	    		case SLAVE1_COMMANDS::LIGHT_DATA:
+	    			slave1.sendPacket(slave1.lightArray.lightData, 16);
+	    			break;
+	    		case SLAVE1_COMMANDS::LIGHT_DATA_REFS:
+	    			slave1.sendPacket(slave1.lightArray.refData, 16);
+	    			break;
+	    		case SLAVE1_COMMANDS::LIGHT_DATA_COLOURS:
+	    			slave1.sendPacket(slave1.lightArray.colours, 16);
+	    			break;
+	    		case SLAVE1_COMMANDS::LIGHT_DATA_GREEN:
+	    			slave1.sendPacket(slave1.lightArray.green, 16);
+	    			break;
+	    		case SLAVE1_COMMANDS::LIGHT_DATA_WHITE:
+	    			slave1.sendPacket(slave1.lightArray.white, 16);
 	    			break;
 	    		case 255:
 	    			break;
@@ -349,6 +376,15 @@ extern "C" int main(void){
 			ledBlinkTime = 500;
 		}
 		if (ledElapsedTime > ledBlinkTime){
+			//lightCalcs();
+			// Serial.print(slave1.lightArray.armFrontSum); Serial.print('\t');
+			// Serial.print(slave1.lightArray.armBackSum); Serial.print('\t');
+			// Serial.print(slave1.lightArray.armRightSum); Serial.print('\t');
+			// Serial.print(slave1.lightArray.armLeftSum); Serial.println();
+			//Serial.println(lightByte, BIN);
+
+			PRINTARRAY(slave1.lightArray.lightData);
+			PRINTARRAY(slave1.lightArray.colours);
 			if (ledState){
 				digitalWriteFast(LED, HIGH);
 			}
