@@ -909,7 +909,7 @@ extern "C" int main(void){
 		if (loopCount % 30 == 0){
 			if (tftEnabled){
 				debugTFT();
-			}			
+			}
 		}
 
 		/* end debugging */
