@@ -173,7 +173,7 @@ uint8_t tsopData[24] = {0};
 /*					       LASER    					  */
 /**********************************************************/
 #define LASER_SIG A1
-#define LASER_REF 152
+#define LASER_REF 159
 
 int laserSig = 0;
 
