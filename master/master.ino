@@ -833,13 +833,13 @@ extern "C" int main(void){
 
 		orbit_k = 1;
 
-		if (tsopStrength > 156){
+		if (tsopStrength > 148){
 			orbit_k = 1.0;
 		}
-		else if (tsopStrength > 150){
+		else if (tsopStrength > 140){
 			orbit_k = 0.9;
 		}
-		else if (tsopStrength > 140){
+		else if (tsopStrength > 135){
 			orbit_k = 0.8;
 		}
 		else if (tsopStrength > 130){
