@@ -233,6 +233,137 @@ void calibIMUOffset(){
 	Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_OFFSET);
 }
 
+void calibLight(){
+	// stop moving
+	Slave3.moveRobot(0, 0, 0);
+	Slave3.moveMotorE(0);
+
+	tftEnableBtn.erase();
+	ltBtn.erase();
+	magBtn.erase();
+	kickBtn.erase();
+	spinBtn.erase();
+
+	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
+
+	BUTTON exitBtn(&tft, &touchedPoint);
+	BUTTON greenBtn(&tft, &touchedPoint);
+	BUTTON whiteBtn(&tft, &touchedPoint);
+	BUTTON endBtn(&tft, &touchedPoint);
+
+	greenBtn.setText("GREEN", 3, ILI9341_GREEN);
+	whiteBtn.setText("WHITE", 3, ILI9341_GREEN);
+	endBtn.setText("END", 3, ILI9341_GREEN);
+
+	exitBtn.setBounds(360 - 80, 0, 360, 32);
+	greenBtn.setBounds(0, 180, 107, 240);
+	whiteBtn.setBounds(107, 180, 214, 240);
+	endBtn.setBounds(214, 180, 320, 240);
+
+	exitBtn.setColour(ILI9341_RED);
+	greenBtn.setColour(tft.color565(50,50,50));
+	whiteBtn.setColour(tft.color565(100,100,100));
+	endBtn.setColour(tft.color565(150,150,150));
+
+	exitBtn.draw();
+	greenBtn.draw();
+	whiteBtn.draw();
+	endBtn.draw();
+
+	tft.setTextSize(1);
+	tft.setTextColor(ILI9341_WHITE);
+	tft.setCursor(0, 40);
+
+	delay(300);
+
+	int greens = 0, whites = 0;
+
+	do{
+		getTouch();
+		exitBtn.checkTouch();
+		greenBtn.checkTouch();
+		whiteBtn.checkTouch();
+		endBtn.checkTouch();
+
+		if (greenBtn.released){
+			tft.print("g ");
+			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_GREEN);
+			greens++;
+			delay(2);
+			Slave1.requestPacket(SLAVE1_COMMANDS::LIGHT_DATA_GREEN);
+			Slave1.receivePacket(inBuffer, 16, true);
+
+			for (int i = 0; i < 16; i++){
+				if (inBuffer[i] < 10){
+					tft.print("  ");
+				}
+				else if (inBuffer[i] <= 100){
+					tft.print(" ");
+				}
+				tft.print(inBuffer[i]);
+				tft.print(" ");
+			}
+			tft.println();
+		}
+		else if (whiteBtn.released){
+			tft.print("w ");
+			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_WHITE);
+			whites++;
+			delay(2);
+			Slave1.requestPacket(SLAVE1_COMMANDS::LIGHT_DATA_WHITE);
+			Slave1.receivePacket(inBuffer, 16, true);		
+			for (int i = 0; i < 16; i++){
+				if (inBuffer[i] < 10){
+					tft.print("  ");
+				}
+				else if (inBuffer[i] <= 100){
+					tft.print(" ");
+				}
+				tft.print(inBuffer[i]);
+				tft.print(" ");
+			}
+			tft.println();
+		}
+		else if (endBtn.released){
+			if (greens && whites){
+				Slave1.requestPacket(SLAVE1_COMMANDS::END_CALIB_LIGHT);
+				tft.println();
+				tft.println("FINISHED CALIB");
+				tft.print("  ");
+				delay(2);
+				Slave1.requestPacket(SLAVE1_COMMANDS::LIGHT_DATA_REFS);
+				Slave1.receivePacket(inBuffer, 16, true);		
+				for (int i = 0; i < 16; i++){
+					if (inBuffer[i] < 10){
+						tft.print("  ");
+					}
+					else if (inBuffer[i] <= 100){
+						tft.print(" ");
+					}
+					if (inBuffer[i] == 255){
+						tft.setTextColor(ILI9341_RED);
+					}
+					else{
+						tft.setTextColor(ILI9341_WHITE);
+					}
+					tft.print(inBuffer[i]);
+					tft.print(" ");
+				}
+				tft.println();
+			}
+			else{
+				if (!greens){
+					tft.println("NEED GREEN");
+				}
+				if (!whites){
+					tft.println("NEED WHITE");
+				}
+			}
+		}
+	} while(!exitBtn.released);
+	initDebugTFT();
+	drawButtons();
+}
 
 void calibMag(){
 	// stop moving
