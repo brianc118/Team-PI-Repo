@@ -501,7 +501,7 @@ void getBackspinSpeed(){
 				}
 				else{
 					// forwards but ball not here yet!
-					backspinSpeed = 200;
+					backspinSpeed = 255;
 				}
 			}
 			else{
@@ -513,7 +513,7 @@ void getBackspinSpeed(){
 				else{
 					// most common. Should only spin when ball is in front
 					if (abs(tsopAngle) < 60){
-						backspinSpeed = 120;
+						backspinSpeed = 255;
 					}
 					else{
 						// no chance of getting ball any time soon
