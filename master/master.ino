@@ -124,7 +124,7 @@ elapsedMillis capChargedTime = 0;
 /*					     Camera   						  */
 /**********************************************************/
 
-//#define PIXY_ENABLED
+#define PIXY_ENABLED
 
 #define PIXY1_ADDRESS 0x54   // default i2c address
 
