@@ -598,7 +598,7 @@ void initDebugTFT(){
 	// tft.color565(50,50,50)
 	tft.setTextSize(1);
 
-	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
+	tft.fillRect(0, 32, 320, 208, ILI9341_BLACK);
 	//tft.fillScreen(ILI9341_BLACK);
 	tft.setCursor(0, 40);
 	tft.setTextColor(ILI9341_RED);
@@ -781,7 +781,7 @@ extern "C" int main(void){
 					calibMag();
 				}
 				else if (ltBtn.released){
-
+					calibLight();
 				}
 				else if (kickBtn.released){
 					kickMode = !kickMode;
