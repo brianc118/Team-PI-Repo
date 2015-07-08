@@ -83,9 +83,11 @@ uint8_t targetVelocity;
 /**********************************************************/
 /*                    Face forwards                       */
 /**********************************************************/
-#define BEARING_KP 1
+// for speed 130, 1.0, 0.1
+// for speed 170, 
+#define BEARING_KP 0.7
 #define BEARING_KD 0.1
-#define ROTATIONCORRECTION_MAX 50
+#define ROTATIONCORRECTION_MAX 70
 
 int32_t targetBearing = 0;
 int32_t rotationCorrection;
