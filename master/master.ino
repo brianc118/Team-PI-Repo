@@ -711,7 +711,8 @@ extern "C" int main(void){
 
 	// begin i2c at 400kHz
 	Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_400);
-
+	Wire.setDefaultTimeout(1000);
+	
 	SPI.setSCK(14);
 	SPI.begin();	
 
