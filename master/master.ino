@@ -873,7 +873,7 @@ extern "C" int main(void){
 		else{
 			kickTime = KICK_TIME;
 		}
-		goalDetected = true;
+		
 		if (ballInZone && goalDetected && abs(goalAngle) < 10){
 			// GO!
 			targetDir = goalAngle;
