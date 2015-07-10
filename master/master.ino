@@ -77,8 +77,14 @@ uint8_t linelocation;
 float orbit_l = 0.5;
 float orbit_k = 1.0;
 int16_t targetDir;
+int16_t lDir;
 int16_t targetDir_r_field;
 uint8_t targetVelocity;
+
+/**********************************************************/
+/*				         Phasing   						  */
+/**********************************************************/
+
 
 /**********************************************************/
 /*                    Face forwards                       */
@@ -712,7 +718,7 @@ extern "C" int main(void){
 	// begin i2c at 400kHz
 	Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_400);
 	Wire.setDefaultTimeout(1000);
-	
+
 	SPI.setSCK(14);
 	SPI.begin();	
 
@@ -899,13 +905,30 @@ extern "C" int main(void){
 		if (spinMode){
 			backspinSpeed = 255;
 		}
-		Slave3.moveRobot((uint8_t)(targetDir * 255/360), targetVelocity, rotationCorrection);
+
+		/* phasing */
+		Serial.println(DIFF180(-170, 170));
+		if (DIFF180(lDir, targetDir) > 1){
+			targetDir = lDir + 1;
+		}
+		else if (DIFF180(lDir, targetDir) < -1){
+			targetDir = lDir - 1;
+		}
+		TOBEARING180(targetDir);
+
+		lDir = targetDir;
+		/* end phasing */
+
+		uint8_t dirByte = (uint8_t)(targetDir * 255/360);
+		Slave3.moveRobot(dirByte, targetVelocity, rotationCorrection);
 		Slave3.moveMotorE(backspinSpeed);
+
+		
 
 		ledBlink();
 		/* debugging */
 
-		serialDebug();
+		//serialDebug();
 		if (loopCount % 30 == 0){
 			if (tftEnabled){
 				debugTFT();
