@@ -36,6 +36,39 @@ elapsedMillis ledElapsedTime;
 bool ledState = true;
 uint32_t ledBlinkTime = 500;
 
+/**********************************************************/
+/*				        playMode  				     	  */
+/**********************************************************/
+#define OFFENSE 0
+#define DEFENSE 1
+#define UNDECIDED 2
+
+uint8_t playMode = UNDECIDED;
+
+bool powerOn = true;
+
+/**********************************************************/
+/*				        wireless   						  */
+/**********************************************************/
+#define XBEE_START 255
+#define XBEE Serial3
+#define XBEE_TIMEOUT 200000 // xbee timeout in ms
+
+uint8_t rx_len;
+uint8_t rx_packet[6];
+uint8_t rx_i;
+uint8_t prev_c;
+
+elapsedMillis rx_elapsed;
+bool xbeeConnected = false;
+
+uint8_t otherRobot_playMode;
+uint8_t otherRobot_tsopStrength;
+int16_t otherRobot_tsopAngle;
+uint8_t otherRobot_lineLocation;
+bool otherRobot_powerOn;
+
+uint8_t tx_i;
 
 /**********************************************************/
 /*					      tft   						  */
@@ -184,6 +217,72 @@ uint8_t tsopData[24] = {0};
 int laserSig = 0;
 
 bool ballInZone = false;
+
+void resetOtherRobotData(){
+	otherRobot_playMode = DEFENSE;
+	otherRobot_tsopStrength = 0;
+	otherRobot_tsopAngle = 0;
+	otherRobot_lineLocation = LINELOCATION::UNKNOWN;
+	otherRobot_powerOn = false;
+}
+
+void rx(){
+	otherRobot_playMode = rx_packet[0];
+	otherRobot_tsopStrength = rx_packet[1];
+	otherRobot_tsopAngle  = (rx_packet[2] << 8) | rx_packet[3];
+	otherRobot_lineLocation = rx_packet[4];
+	otherRobot_powerOn = rx_packet[5];
+	Serial.print("received\t");
+	Serial.print(otherRobot_playMode); Serial.print('\t');
+	Serial.print(otherRobot_tsopStrength); Serial.print('\t');
+	Serial.print(otherRobot_tsopAngle); Serial.print('\t');
+	Serial.print(otherRobot_lineLocation); Serial.print('\t');
+	Serial.println(otherRobot_powerOn);
+}
+
+void tx(){
+	switch(tx_i){
+		case 0: XBEE.write(XBEE_START); XBEE.write(XBEE_START); break;
+		case 1: XBEE.write(playMode); break;
+		case 2: XBEE.write(tsopStrength); break;
+		case 3: XBEE.write(highByte(tsopAngle)); break;
+		case 4: XBEE.write(lowByte(tsopAngle)); break;
+		case 5: XBEE.write(linelocation); break;
+		case 6: XBEE.write(powerOn); break;
+	}
+	tx_i++;
+	if (tx_i == 7) tx_i = 0;
+}
+
+void xbeeTryTxRx(){
+	tx();
+
+	rx_len = XBEE.available();
+	if(rx_len){
+		for(uint8_t i = 0; i < rx_len; i++){
+			uint8_t c = XBEE.read();
+			if(c == XBEE_START && prev_c == XBEE_START){
+				rx_i = 0; 
+			}
+			else if(rx_i <= 5){
+				rx_packet[rx_i] = c;
+				rx_i++;
+			}
+			if(rx_i == 6){
+				rx();
+				rx_elapsed = 0;
+				xbeeConnected = true;
+				rx_i = 7;
+			}
+			prev_c = c;
+		}
+	}
+
+	if(rx_elapsed >= 50){
+		xbeeConnected = false;
+		resetOtherRobotData();
+	}
+}
 
 inline void ledBlink(){
 	// led blinking
@@ -714,6 +813,7 @@ void serialDebug(){
 
 extern "C" int main(void){	
 	Serial.begin(115200);
+	XBEE.begin(9600);
 
 	// begin i2c at 400kHz
 	Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_400);
@@ -803,6 +903,10 @@ extern "C" int main(void){
 
 				break;
 		}
+		/* xbee */
+		xbeeTryTxRx();
+		/* end xbee */
+
 		/* orientation/imu */
 		getSlave1Data();
 		/* end orientation/imu */
