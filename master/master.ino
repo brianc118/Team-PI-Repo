@@ -1178,40 +1178,11 @@ extern "C" int main(void){
 		checkBallInZone();
 		/* end ball in zone */
 
+		getPlayMode();
+
 		/*movement control*/
+		getMovement(playMode);
 
-		targetVelocity = NORMAL_SPEED;
-
-		orbit_k = 1;
-
-		if (tsopStrength > 148){
-			orbit_k = 1.0;
-		}
-		else if (tsopStrength > 140){
-			orbit_k = 0.9;
-		}
-		else if (tsopStrength > 135){
-			orbit_k = 0.8;
-		}
-		else if (tsopStrength > 130){
-			orbit_k = 0.7;
-		}
-		else if (tsopStrength > 120){
-			orbit_k = 0.6;
-		}
-		else if (tsopStrength > 100){
-			orbit_k = 0.55;
-		}
-		else if (tsopStrength > 70){
-			orbit_k = 0.5;
-		}
-		else{
-			targetVelocity = 0;
-		}
-
-		targetDir_r_field = (270 - abs(tsopAngle_r_targetBearing * orbit_k)) / 90 * tsopAngle_r_targetBearing * orbit_k;
-
-		TOBEARING180(targetDir_r_field);
 		targetDir = targetDir_r_field - bearing_int;
 		TOBEARING180(targetDir);
 		
