@@ -60,7 +60,7 @@ uint8_t rx_packet[6];
 uint8_t rx_i;
 uint8_t prev_c;
 
-elapsedMillis rx_elapsed;
+elapsedMicros rx_elapsed;
 bool xbeeConnected = false;
 
 uint8_t otherRobot_playMode;
