@@ -1159,11 +1159,30 @@ extern "C" int main(void){
 		/* end tsops */
 
 		/* goal detection */
+#ifdef PIXY_ENABLED
 		getGoalData();
 		/* end goal detection */
-
+#endif
 		/* face forwards */
-		targetBearing = goalAngle_r_field; // always face goals
+		if (goalDetected){
+			targetBearing = goalAngle_r_field * 1.3; // always face goals
+		}
+		else if (linelocation == LINELOCATION::SIDE_LEFT){
+			targetBearing = 45;
+		}
+		else if (linelocation == LINELOCATION::SIDE_RIGHT){
+			targetBearing = -45;
+		}
+		else if (linelocation == LINELOCATION::CORNER_TOP_LEFT){
+			targetBearing = 90;
+		}
+		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT){
+			targetBearing = -90;
+		}
+		else{
+			targetBearing = 0;
+		}
+		
 		tsopAngle_r_targetBearing = tsopAngle_r_field - targetBearing; // target bearing is relative to field
 		TOBEARING180(tsopAngle_r_targetBearing);
 
