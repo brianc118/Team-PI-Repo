@@ -21,12 +21,13 @@
 #include <PID.h>
 #include <DebugUtils.h>
 
+//#define PHASING
 #define DEBUG_SERIAL
  
 #define LED 13
 
-#define RAMMING_SPEED 200
-#define NORMAL_SPEED 150
+#define SUPER_SPEED 170
+#define NORMAL_SPEED 130
 
 uint32_t loopCount = 0;
 
