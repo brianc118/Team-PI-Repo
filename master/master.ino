@@ -168,7 +168,7 @@ elapsedMillis capChargedTime = 0;
 
 #define PIXY1_ADDRESS 0x54   // default i2c address
 
-#define MIN_BLOCK_AREA   1500
+#define MIN_BLOCK_AREA   1000
 
 PixyI2C pixy1(PIXY1_ADDRESS);
 
