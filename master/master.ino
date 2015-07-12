@@ -1228,7 +1228,7 @@ extern "C" int main(void){
 		if (ballInZone && goalDetected && abs(goalAngle) < 10){
 			// GO!
 			targetDir = goalAngle;
-			targetVelocity = RAMMING_SPEED;
+			targetVelocity = SUPER_SPEED;
 			// kick!
 			if (capChargedTime > kickTime){
 				kick();
