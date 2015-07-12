@@ -103,7 +103,7 @@ uint8_t inBuffer[24] = {0};
 float bearing;
 float bearing_offset;
 int32_t bearing_int;
-uint8_t linelocation;
+uint8_t linelocation, linelocation_prev;
 
 /**********************************************************/
 /*                        Orbit                           */
