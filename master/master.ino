@@ -1051,7 +1051,6 @@ void serialDebug(){
 
 extern "C" int main(void){	
 	Serial.begin(115200);
-	XBEE.begin(9600);
 
 	// begin i2c at 400kHz
 	Wire.begin(I2C_MASTER, 0x00, I2C_PINS_18_19, I2C_PULLUP_EXT, I2C_RATE_400);
@@ -1061,6 +1060,8 @@ extern "C" int main(void){
 	SPI.begin();	
 
 	delay(1000);
+
+	XBEE.begin(57600);
 	tft.begin();
 	drawPiLogo();
 
