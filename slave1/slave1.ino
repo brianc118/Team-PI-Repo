@@ -205,6 +205,7 @@ void lightCalcs(){
 	
 	switch (lightByte){
 		case 0: /*nothing*/ 
+			slave1.lineLocation = LINELOCATION::FIELD;
 			break;
 		case 1: /*front*/ 
 			slave1.lineLocation = LINELOCATION::SIDE_TOP;
@@ -219,7 +220,7 @@ void lightCalcs(){
 			slave1.lineLocation = LINELOCATION::SIDE_RIGHT;
 			break;
 		case 5: /*front right*/ 
-			slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
+			slave1.lineLocation = LINELOCATION::CORNER_TOP_RIGHT;
 			break;
 		case 6: /*back right*/
 			slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_RIGHT;
@@ -314,7 +315,7 @@ extern "C" int main(void){
 		slave1.lightArray.getColours();
 		// Serial.println();
 		
-
+		lightCalcs();
 		
 		
 		uint8_t command = slave1.checkIfRequested();
@@ -376,7 +377,6 @@ extern "C" int main(void){
 			ledBlinkTime = 500;
 		}
 		if (ledElapsedTime > ledBlinkTime){
-			//lightCalcs();
 			// Serial.print(slave1.lightArray.armFrontSum); Serial.print('\t');
 			// Serial.print(slave1.lightArray.armBackSum); Serial.print('\t');
 			// Serial.print(slave1.lightArray.armRightSum); Serial.print('\t');
