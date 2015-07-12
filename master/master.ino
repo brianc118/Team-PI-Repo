@@ -1272,16 +1272,27 @@ extern "C" int main(void){
 
 		ledBlink();
 		/* debugging */
-
+		Serial.println(playMode);
 		//serialDebug();
 		if (loopCount % 30 == 0){
 			if (tftEnabled){
 				debugTFT();
+				if (playMode == OFFENSE){
+					tftEnableBtn.setColour(ILI9341_RED);
+				}
+				else if (playMode == DEFENSE){
+					tftEnableBtn.setColour(ILI9341_BLUE);
+				}
+				else{
+					tftEnableBtn.setColour(ILI9341_WHITE);
+				}
+				tftEnableBtn.draw(false);
 			}
 		}
 
 		/* end debugging */
 
 		loopCount++;  // update loop count
+		linelocation_prev = linelocation;
 	}
 }
