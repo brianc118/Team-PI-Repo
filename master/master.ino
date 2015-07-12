@@ -280,17 +280,230 @@ void xbeeTryTxRx(){
 			}
 			if(rx_i == 6){
 				rx();
+				tx();
 				rx_elapsed = 0;
 				xbeeConnected = true;
 				rx_i = 7;
 			}
 			prev_c = c;
 		}
+		//Serial.println();
 	}
 
-	if(rx_elapsed >= 50){
+	if(rx_elapsed >= XBEE_TIMEOUT){
+		rx_elapsed = 0;
 		xbeeConnected = false;
 		resetOtherRobotData();
+		tx(); // try to transmit just in case the other hasn't received
+	}
+}
+
+void getPlayMode(){
+	if (!xbeeConnected || !otherRobot_powerOn){
+		// other robot not connected or 15v not on
+		playMode = OFFENSE;
+	}
+	else{
+		int a = 0, b = 0;
+		// other robot connected.
+		// first layer compares tsop strength
+		if (tsopStrength > 150){
+			a+=6;
+		}
+		else if (tsopStrength > 130){
+			a+=4;
+		}
+		else if (tsopStrength > 70){
+			a+=1;
+		}
+		if (otherRobot_tsopStrength > 150){
+			b+=6;
+		}
+		else if (otherRobot_tsopStrength > 130){
+			b+=4;
+		}
+		else if (otherRobot_tsopStrength > 70){
+			b+=1;
+		}
+		if (a > b){
+			playMode = OFFENSE;
+		}
+		else if (a < b){
+			playMode = DEFENSE;
+		}
+		else{
+			// first check that they're not both not seeing the ball.
+			// if they both can't see the ball they are both forced to be defense
+			if (tsopStrength == 0){
+				playMode == DEFENSE;
+			}
+			// similar strength now look at angle
+			if (abs(DIFF180(tsopAngle, otherRobot_tsopAngle)) < 10){
+				// too close to call, consider strength mainly
+				if (tsopStrength > otherRobot_tsopStrength){
+					playMode = OFFENSE;
+				}
+				else{
+					playMode = DEFENSE;
+				}
+			}
+		}		
+	}
+}
+
+void getMovement(uint8_t playMode){
+	if (playMode == OFFENSE){
+		if (linelocation == LINELOCATION::FIELD){
+			targetVelocity = NORMAL_SPEED;
+
+			orbit_k = 1;
+
+			if (tsopStrength > 148){
+				orbit_k = 1.0;
+			}
+			else if (tsopStrength > 140){
+				orbit_k = 0.9;
+			}
+			else if (tsopStrength > 135){
+				orbit_k = 0.8;
+			}
+			else if (tsopStrength > 130){
+				orbit_k = 0.7;
+			}
+			else if (tsopStrength > 120){
+				orbit_k = 0.6;
+			}
+			else if (tsopStrength > 100){
+				targetVelocity = SUPER_SPEED;
+				orbit_k = 0.55;
+			}
+			else if (tsopStrength > 70){
+				targetVelocity = SUPER_SPEED;
+				orbit_k = 0.5;
+			}
+			else{
+				targetVelocity = 0;
+			}
+
+			if ((tsopAngle_r_targetBearing < -170 && tsopAngle_r_targetBearing >= -180)
+			  || tsopAngle_r_targetBearing > 170 && tsopAngle_r_targetBearing <= 180){
+				//
+			}
+
+			targetDir_r_field = (270 - abs(tsopAngle_r_targetBearing * orbit_k)) / 90 * tsopAngle_r_targetBearing * orbit_k;
+			TOBEARING180(targetDir_r_field);
+			if (targetDir_r_field < -170 || targetDir_r_field > 170){
+				targetVelocity = SUPER_SPEED;
+			}
+		}
+		else if (linelocation == LINELOCATION::SIDE_RIGHT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = -90;
+		}
+		else if (linelocation == LINELOCATION::SIDE_LEFT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = 90;
+		}
+		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT || linelocation == LINELOCATION::CORNER_TOP_LEFT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = 180;
+		}
+		else if (linelocation == LINELOCATION::CORNER_BOTTOM_RIGHT || linelocation == LINELOCATION::CORNER_BOTTOM_LEFT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = 0;
+		}
+		else if (linelocation == LINELOCATION::UNKNOWN){
+			targetVelocity = NORMAL_SPEED;
+			// use ultrasonics now
+			if (leftDistance <= 30 && rightDistance > 30){
+				// left
+				targetDir_r_field = 90;
+			}
+			else if (leftDistance > 30 && rightDistance <= 30){
+				// right
+				targetDir_r_field = -90;
+			}
+			else if (leftDistance <= 30 && rightDistance <= 30){
+				// top or bottom
+				if (backDistance <= 25){
+					// bottom
+					targetDir_r_field = 0;
+				}
+				else{
+					// top
+					targetDir_r_field = 180;
+				}
+			}
+			else{
+				// we're screwed
+				targetVelocity = 0;
+				targetDir_r_field = 0;
+			}
+			linelocation = linelocation_prev;
+		}
+	}
+	else if (playMode == DEFENSE){
+		if (linelocation == LINELOCATION::FIELD){
+			// check ultrasonics work
+			int forwardV = 0, sideV = 0;
+			
+			if (leftDistance != 255 && rightDistance != 255){
+				sideV = 2*(rightDistance - leftDistance);
+			}
+			if (backDistance != 255){
+				if (backDistance > 30){
+					forwardV = -100;
+				}
+				else if (backDistance < 15){
+					forwardV = 100;
+				}
+			}
+			targetDir_r_field = (int16_t)(atan2(sideV, forwardV)*180/PI);
+			targetVelocity = 50;
+		}
+		else if (linelocation == LINELOCATION::SIDE_RIGHT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = -90;
+		}
+		else if (linelocation == LINELOCATION::SIDE_LEFT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = 90;
+		}
+		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT || linelocation == LINELOCATION::CORNER_TOP_LEFT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = 180;
+		}
+		else if (linelocation == LINELOCATION::CORNER_BOTTOM_RIGHT || linelocation == LINELOCATION::CORNER_BOTTOM_LEFT){
+			targetVelocity = NORMAL_SPEED;
+			targetDir_r_field = 0;
+		}
+		else if (linelocation == LINELOCATION::UNKNOWN){
+			targetVelocity = 0;
+			targetDir_r_field = 0;
+			// // use ultrasonics now
+			// if (leftDistance <= 30 && rightDistance > 30){
+			// 	// left
+			// }
+			// else if (leftDistance > 30 && rightDistance <= 30){
+			// 	// right
+			// }
+			// else if (leftDistance <= 30 && rightDistance <= 30){
+			// 	// top or bottom
+			// 	if (backDistance <= 30){
+			// 		// bottom
+			// 	}
+			// 	else{
+			// 		// top
+			// 	}
+			// }
+			// else{
+			// 	// we're screwed
+			// }
+			// linelocation = linelocation_prev;
+		}
+	}
+	else{
+		// ???
 	}
 }
 
