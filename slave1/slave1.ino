@@ -175,21 +175,21 @@ void lightCalcs(){
 		rightSum = slave1.lightArray.armRightSum;
 		leftSum  = slave1.lightArray.armLeftSum;
 	}
-	else if (bearing > 45 && bearing <= 135){
+	else if (bearing > 90 - 45 && bearing <= 90 + 45){
 		// facing right
 		rightSum = slave1.lightArray.armFrontSum;
 		leftSum  = slave1.lightArray.armBackSum;
 		backSum  = slave1.lightArray.armRightSum;
 		frontSum = slave1.lightArray.armLeftSum;
 	}
-	else if (bearing < -45  && bearing >= -135){
+	else if (bearing < -90 + 45  && bearing >= -90 - 45){
 		// facing left
 		leftSum = slave1.lightArray.armFrontSum;
 		rightSum  = slave1.lightArray.armBackSum;
 		frontSum = slave1.lightArray.armRightSum;
 		backSum  = slave1.lightArray.armLeftSum;
 	}
-	else{
+	else if ((bearing < -180 + 45 && bearing >= 180)||(bearing > 180 - 45)){
 		// facing back
 		backSum   = slave1.lightArray.armFrontSum;
 		frontSum = slave1.lightArray.armBackSum;
