@@ -242,28 +242,37 @@ void rx(){
 }
 
 void tx(){
-	switch(tx_i){
-		case 0: XBEE.write(XBEE_START); XBEE.write(XBEE_START); break;
-		case 1: XBEE.write(playMode); break;
-		case 2: XBEE.write(tsopStrength); break;
-		case 3: XBEE.write(highByte(tsopAngle)); break;
-		case 4: XBEE.write(lowByte(tsopAngle)); break;
-		case 5: XBEE.write(linelocation); break;
-		case 6: XBEE.write(powerOn); break;
-	}
-	tx_i++;
-	if (tx_i == 7) tx_i = 0;
+
+	// switch(tx_i){
+	// 	// case 0: XBEE.write(XBEE_START); XBEE.write(XBEE_START); break;
+	// 	// case 1: XBEE.write(playMode); break;
+	// 	// case 2: XBEE.write(tsopStrength); break;
+	// 	// case 3: XBEE.write(highByte(tsopAngle)); break;
+	// 	// case 4: XBEE.write(lowByte(tsopAngle)); break;
+	// 	// case 5: XBEE.write(linelocation); break;
+	// 	// case 6: XBEE.write(powerOn); break;
+	// }
+	// tx_i++;
+	// if (tx_i == 8) tx_i = 0;
+	XBEE.write(XBEE_START); 
+	XBEE.write(XBEE_START); 
+	XBEE.write(playMode); 
+	XBEE.write(tsopStrength); 
+	XBEE.write(highByte(tsopAngle)); 
+	XBEE.write(lowByte(tsopAngle)); 
+	XBEE.write(linelocation); 
+	XBEE.write(powerOn); 
 }
 
 void xbeeTryTxRx(){
-	tx();
 
 	rx_len = XBEE.available();
 	if(rx_len){
-		for(uint8_t i = 0; i < rx_len; i++){
+		while(XBEE.available()){
 			uint8_t c = XBEE.read();
+			//Serial.print(rx_i);
 			if(c == XBEE_START && prev_c == XBEE_START){
-				rx_i = 0; 
+				rx_i = 0;
 			}
 			else if(rx_i <= 5){
 				rx_packet[rx_i] = c;
