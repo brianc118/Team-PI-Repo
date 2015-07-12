@@ -233,7 +233,7 @@ void rx(){
 	otherRobot_tsopAngle  = (rx_packet[2] << 8) | rx_packet[3];
 	otherRobot_lineLocation = rx_packet[4];
 	otherRobot_powerOn = rx_packet[5];
-	Serial.print("received\t");
+	Serial.print(micros()); Serial.print('\t');
 	Serial.print(otherRobot_playMode); Serial.print('\t');
 	Serial.print(otherRobot_tsopStrength); Serial.print('\t');
 	Serial.print(otherRobot_tsopAngle); Serial.print('\t');
