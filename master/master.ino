@@ -909,7 +909,7 @@ void drawButtons(){
 	spinBtn.setBounds(214, 120, 320, 180);
 
 
-	tftEnableBtn.setColour(ILI9341_RED);
+	tftEnableBtn.setColour(ILI9341_WHITE);
 	magBtn.setColour(tft.color565(50,50,50));
 	ltBtn.setColour(tft.color565(100,100,100));
 	kickBtn.setColour(tft.color565(150,150,150));
@@ -951,6 +951,8 @@ void initDebugTFT(){
 	tft.println("rotationCorrection");
 	tft.setTextColor(ILI9341_CYAN);
 	tft.println("linelocation");
+	tft.setTextColor(ILI9341_WHITE);
+	tft.println("xbeeConnected");
 }
 void debugTFT(){
 	tft.invertDisplay(false);
@@ -980,7 +982,20 @@ void debugTFT(){
 	tft.println(bearing);
 	tft.println(rotationCorrection);
 	tft.setTextColor(ILI9341_CYAN);
-	tft.println(linelocation);
+	switch (linelocation){
+		case LINELOCATION::FIELD: tft.println("f"); break;
+		case LINELOCATION::UNKNOWN: tft.println("u"); break;
+		case LINELOCATION::CORNER_BOTTOM_LEFT: tft.println("c_bl"); break;
+		case LINELOCATION::CORNER_BOTTOM_RIGHT: tft.println("c_br"); break;
+		case LINELOCATION::CORNER_TOP_LEFT: tft.println("c_tl"); break;
+		case LINELOCATION::CORNER_TOP_RIGHT: tft.println("c_tr"); break;
+		case LINELOCATION::SIDE_TOP: tft.println("t"); break;
+		case LINELOCATION::SIDE_BOTTOM: tft.println("b"); break;
+		case LINELOCATION::SIDE_LEFT: tft.println("l"); break;
+		case LINELOCATION::SIDE_RIGHT: tft.println("r");  break;
+	}
+	tft.setTextColor(ILI9341_WHITE);
+	tft.println(xbeeConnected);
 	tft.x_offset = 0;
 }
 
