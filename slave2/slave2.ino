@@ -234,7 +234,7 @@ void TSOP_ISR(){
 
 			tsops.filterData();
 			tsops.getStrength();
-			tsops.getAngle();
+			tsops.getAngle(3);
 			tsopAngleVol = tsops.angle;
 			tsopStrengthVol = tsops.averageStrength;
 			// tsopAngleVol = -99;
