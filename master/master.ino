@@ -1096,13 +1096,15 @@ extern "C" int main(void){
 	initDebugTFT();
 	drawButtons();
 
-
+	tx();
 	while(1){		
 		// save some time here as reading srf08's has seen to dramatically decrease performance
 		switch(loopCount % 5){
+			case 0: 
 #ifdef PIXY_ENABLED
-			case 0: blocks = pixy1.getBlocks(); break;
+				blocks = pixy1.getBlocks();
 #endif
+				break;
 			case 1: srfBack.getRangeIfCan(backDistance); break;
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
 			case 3: srfLeft.getRangeIfCan(leftDistance); break;
