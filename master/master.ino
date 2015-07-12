@@ -1252,7 +1252,7 @@ extern "C" int main(void){
 		}
 
 		/* phasing */
-		Serial.println(DIFF180(-170, 170));
+#ifdef PHASING
 		if (DIFF180(lDir, targetDir) > 1){
 			targetDir = lDir + 1;
 		}
@@ -1262,6 +1262,7 @@ extern "C" int main(void){
 		TOBEARING180(targetDir);
 
 		lDir = targetDir;
+#endif
 		/* end phasing */
 
 		uint8_t dirByte = (uint8_t)(targetDir * 255/360);
