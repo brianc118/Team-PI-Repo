@@ -164,7 +164,7 @@ elapsedMillis capChargedTime = 0;
 /*					     Camera   						  */
 /**********************************************************/
 
-#define PIXY_ENABLED
+//#define PIXY_ENABLED
 
 #define PIXY1_ADDRESS 0x54   // default i2c address
 
@@ -240,27 +240,15 @@ void rx(){
 	otherRobot_tsopAngle  = (rx_packet[2] << 8) | rx_packet[3];
 	otherRobot_lineLocation = rx_packet[4];
 	otherRobot_powerOn = rx_packet[5];
-	Serial.print(micros()); Serial.print('\t');
-	Serial.print(otherRobot_playMode); Serial.print('\t');
-	Serial.print(otherRobot_tsopStrength); Serial.print('\t');
-	Serial.print(otherRobot_tsopAngle); Serial.print('\t');
-	Serial.print(otherRobot_lineLocation); Serial.print('\t');
-	Serial.println(otherRobot_powerOn);
+	// Serial.print(micros()); Serial.print('\t');
+	// Serial.print(otherRobot_playMode); Serial.print('\t');
+	// Serial.print(otherRobot_tsopStrength); Serial.print('\t');
+	// Serial.print(otherRobot_tsopAngle); Serial.print('\t');
+	// Serial.print(otherRobot_lineLocation); Serial.print('\t');
+	// Serial.println(otherRobot_powerOn);
 }
 
 void tx(){
-
-	// switch(tx_i){
-	// 	// case 0: XBEE.write(XBEE_START); XBEE.write(XBEE_START); break;
-	// 	// case 1: XBEE.write(playMode); break;
-	// 	// case 2: XBEE.write(tsopStrength); break;
-	// 	// case 3: XBEE.write(highByte(tsopAngle)); break;
-	// 	// case 4: XBEE.write(lowByte(tsopAngle)); break;
-	// 	// case 5: XBEE.write(linelocation); break;
-	// 	// case 6: XBEE.write(powerOn); break;
-	// }
-	// tx_i++;
-	// if (tx_i == 8) tx_i = 0;
 	XBEE.write(XBEE_START); 
 	XBEE.write(XBEE_START); 
 	XBEE.write(playMode); 
@@ -272,7 +260,6 @@ void tx(){
 }
 
 void xbeeTryTxRx(){
-
 	rx_len = XBEE.available();
 	if(rx_len){
 		while(XBEE.available()){
@@ -294,7 +281,6 @@ void xbeeTryTxRx(){
 			}
 			prev_c = c;
 		}
-		//Serial.println();
 	}
 
 	if(rx_elapsed >= XBEE_TIMEOUT){
@@ -446,7 +432,6 @@ void getMovement(uint8_t playMode){
 				targetVelocity = 0;
 				targetDir_r_field = 0;
 			}
-			linelocation = linelocation_prev;
 		}
 	}
 	else if (playMode == DEFENSE){
@@ -514,15 +499,11 @@ void getMovement(uint8_t playMode){
 	}
 }
 
-inline void ledBlink(){
+void ledBlink(){
 	// led blinking
 	if (ledElapsedTime > ledBlinkTime){
-		if (ledState){
-			digitalWriteFast(LED, HIGH);
-		}
-		else{
-			digitalWriteFast(LED, LOW);
-		}
+		if (ledState)   digitalWriteFast(LED, HIGH);
+		else     		digitalWriteFast(LED, LOW);
 		ledState = !ledState;
 		ledElapsedTime = 0;
 	}
@@ -1162,6 +1143,27 @@ extern "C" int main(void){
 		getSlave1Data();
 		/* end orientation/imu */
 
+		// location
+		if (linelocation == LINELOCATION::UNKNOWN){
+			// we can't tell where we are from line
+			// use ultrasonics
+			if (leftDistance < 35 && rightDistance < 35){
+				linelocation = LINELOCATION::SIDE_TOP;
+				if (backDistance < 35){
+					linelocation = LINELOCATION::SIDE_BOTTOM;
+				}
+			}
+			else if (leftDistance < 35){
+				linelocation = LINELOCATION::SIDE_LEFT;
+			}
+			else if (rightDistance < 35){
+				linelocation = LINELOCATION::SIDE_RIGHT;
+			}
+			else{
+				linelocation = LINELOCATION::UNKNOWN;
+			}
+		}
+
 		/* tsops */
 		getSlave2Data();
 		tsopAngle_r_field = tsopAngle + bearing_int;
@@ -1183,10 +1185,10 @@ extern "C" int main(void){
 		else if (linelocation == LINELOCATION::SIDE_RIGHT){
 			targetBearing = -45;
 		}
-		else if (linelocation == LINELOCATION::CORNER_TOP_LEFT){
+		else if (linelocation == LINELOCATION::CORNER_TOP_LEFT || linelocation == LINELOCATION::SIDE_TOP){
 			targetBearing = 90;
 		}
-		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT){
+		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT || linelocation == LINELOCATION::SIDE_BOTTOM){
 			targetBearing = -90;
 		}
 		else{
@@ -1273,8 +1275,7 @@ extern "C" int main(void){
 
 		ledBlink();
 		/* debugging */
-		Serial.println(playMode);
-		//serialDebug();
+		serialDebug();
 		if (loopCount % 30 == 0){
 			if (tftEnabled){
 				debugTFT();
