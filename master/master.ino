@@ -213,11 +213,18 @@ uint8_t tsopData[24] = {0};
 /*					       LASER    					  */
 /**********************************************************/
 #define LASER_SIG A1
-#define LASER_REF 159
+#define LASER_REF 950
 
 int laserSig = 0;
 
 bool ballInZone = false;
+
+void kickDog() {
+	noInterrupts();
+	WDOG_REFRESH = 0xA602;
+	WDOG_REFRESH = 0xB480;
+	interrupts();
+}
 
 void resetOtherRobotData(){
 	otherRobot_playMode = DEFENSE;
@@ -1061,6 +1068,8 @@ extern "C" int main(void){
 
 	delay(1000);
 
+	kickDog();
+
 	XBEE.begin(57600);
 	tft.begin();
 	drawPiLogo();
@@ -1092,13 +1101,14 @@ extern "C" int main(void){
 
 	//delay(800);
 	tft.println("Calibrating IMU offset");
-	calibIMUOffset();
+	//calibIMUOffset();
 	
 	initDebugTFT();
 	drawButtons();
 
 	tx();
 	while(1){		
+		kickDog();
 		// save some time here as reading srf08's has seen to dramatically decrease performance
 		switch(loopCount % 5){
 			case 0: 
