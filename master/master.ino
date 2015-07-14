@@ -871,7 +871,7 @@ void checkBallInZone(){
 	laserSig = analogRead(LASER_SIG);
 	if (laserSig < LASER_REF 
 	 && abs(tsopAngle) < 30
-	 && tsopStrength > 150){
+	 && tsopStrength > 140){
 		ballInZone = true;
 	}
 	else{
