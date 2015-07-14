@@ -1250,7 +1250,9 @@ extern "C" int main(void){
 			rotationCorrection = 0;
 		}
 		if (spinMode){
+			targetVelocity = 0;
 			backspinSpeed = 255;
+			rotationCorrection = 0;
 		}
 
 		/* phasing */
