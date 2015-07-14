@@ -115,9 +115,10 @@ int16_t lDir;
 int16_t targetDir_r_field;
 uint8_t targetVelocity;
 
+bool inFrontOrbitMode = false;
+
 /**********************************************************/
-/*				         Phasing   						  */
-/**********************************************************/
+float dirBoundaries[2] = {-180, 180};
 
 
 /**********************************************************/
@@ -344,155 +345,192 @@ void getPlayMode(){
 	}
 }
 
+
+
+bool betweenDirBoundaries(float a){
+	return isBetween(a, dirBoundaries[0], dirBoundaries[1]);
+}
+
+void getOrbit(bool frontOrbit = false){
+	// regardless of input, if inFrontOrbitMode, then must be front orbit
+	// check if front orbit complete
+	if (frontOrbit){
+		// check if you can actually front orbit
+		frontOrbit = abs(tsopAngle_r_targetBearing) > 90;
+	}
+	if (inFrontOrbitMode && abs(tsopAngle_r_targetBearing) > 90){
+		inFrontOrbitMode = false;
+	}
+
+	if (!frontOrbit && !inFrontOrbitMode){
+		targetVelocity = NORMAL_SPEED;
+
+		if (tsopStrength > 148){
+			orbit_k = 1.0;
+			orbit_l = 0.5;
+		}
+		else if (tsopStrength > 140){
+			orbit_k = 0.9;
+			orbit_l = 0.4;
+		}
+		else if (tsopStrength > 135){
+			orbit_k = 0.8;
+			orbit_l = 0.3;
+		}
+		else if (tsopStrength > 130){
+			orbit_k = 0.7;
+			orbit_l = 0.2;
+		}
+		else if (tsopStrength > 120){
+			orbit_k = 0.6;
+			orbit_l = 0.1;
+		}
+		else if (tsopStrength > 100){
+			targetVelocity = SUPER_SPEED;
+			orbit_k = 0.55;
+			orbit_l = 0.05;
+		}
+		else if (tsopStrength > 70){
+			targetVelocity = SUPER_SPEED;
+			orbit_k = 0.5;
+			orbit_l = 0;
+		}
+		else{
+			targetVelocity = 0;
+		}
+		float minDiff = (270 - 90 * orbit_k) / 90 * 90 * orbit_k - 90; // min diff after 90 degrees
+		float diff;
+		float diffComp; // complement of difference
+
+		targetDir_r_field = (270 - abs(tsopAngle_r_targetBearing * orbit_k)) / 90 * tsopAngle_r_targetBearing * orbit_k;
+
+		diff = targetDir_r_field - tsopAngle_r_targetBearing;
+		diffComp = SIGN(tsopAngle_r_targetBearing) * minDiff - diff;
+
+		if (abs(diffComp) > minDiff){
+			// need to cut down
+			targetDir_r_field = tsopAngle_r_targetBearing + diff + orbit_l * diffComp;
+		}
+	}
+	else{
+		if (tsopAngle_r_targetBearing > 0){
+			targetDir_r_field = tsopAngle_r_field - 90;
+		}
+		else{
+			targetDir_r_field = tsopAngle_r_field + 90;
+		}
+		inFrontOrbitMode = true;
+	}
+	TOBEARING180(targetDir_r_field);
+
+	if (targetDir_r_field < -170 || targetDir_r_field > 170){
+		targetVelocity = SUPER_SPEED;
+	}
+}
+
+void playDefense(){
+	int forwardV = 0, sideV = 0;
+	
+	if (tsopStrength > 70){
+		// move to ball
+		if (tsopAngle_r_field > 5){
+			// ball on right.
+			sideV = 100;
+		}
+		else if (tsopAngle_r_field < -5){
+			sideV = -100;
+		}
+		else{
+			sideV = 0;
+		}
+	}
+	else{
+		if (leftDistance != 255 && rightDistance != 255){
+			// move to middle
+			sideV = 2*(rightDistance - leftDistance);
+		}
+	}	
+
+	if (backDistance != 255){
+		if (backDistance > 30){
+			forwardV = -100;
+		}
+		else if (backDistance < 15){
+			forwardV = 100;
+		}
+	}
+	targetDir_r_field = (int16_t)(atan2(sideV, forwardV)*180/PI);
+	targetVelocity = NORMAL_SPEED;
+
+	// override if we're on line
+	switch(linelocation){
+		case LINELOCATION::SIDE_LEFT:           targetDir_r_field = 90;  targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::SIDE_RIGHT:          targetDir_r_field = -90; targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::SIDE_TOP:            targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::SIDE_BOTTOM:         targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::CORNER_TOP_RIGHT:    targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::CORNER_TOP_LEFT:     targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::CORNER_BOTTOM_RIGHT: targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::CORNER_BOTTOM_LEFT:  targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
+	}		
+}
+
 void getMovement(uint8_t playMode){
 	if (playMode == OFFENSE){
-		if (linelocation == LINELOCATION::FIELD){
-			targetVelocity = NORMAL_SPEED;
-
-			orbit_k = 1;
-
-			if (tsopStrength > 148){
-				orbit_k = 1.0;
-			}
-			else if (tsopStrength > 140){
-				orbit_k = 0.9;
-			}
-			else if (tsopStrength > 135){
-				orbit_k = 0.8;
-			}
-			else if (tsopStrength > 130){
-				orbit_k = 0.7;
-			}
-			else if (tsopStrength > 120){
-				orbit_k = 0.6;
-			}
-			else if (tsopStrength > 100){
-				targetVelocity = SUPER_SPEED;
-				orbit_k = 0.55;
-			}
-			else if (tsopStrength > 70){
-				targetVelocity = SUPER_SPEED;
-				orbit_k = 0.5;
-			}
-			else{
-				targetVelocity = 0;
-			}
-
-			if ((tsopAngle_r_targetBearing < -170 && tsopAngle_r_targetBearing >= -180)
-			  || tsopAngle_r_targetBearing > 170 && tsopAngle_r_targetBearing <= 180){
-				//
-			}
-
-			targetDir_r_field = (270 - abs(tsopAngle_r_targetBearing * orbit_k)) / 90 * tsopAngle_r_targetBearing * orbit_k;
-			TOBEARING180(targetDir_r_field);
-			if (targetDir_r_field < -170 || targetDir_r_field > 170){
-				targetVelocity = SUPER_SPEED;
-			}
-		}
-		else if (linelocation == LINELOCATION::SIDE_RIGHT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = -90;
-		}
-		else if (linelocation == LINELOCATION::SIDE_LEFT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = 90;
-		}
-		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT || linelocation == LINELOCATION::CORNER_TOP_LEFT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = 180;
-		}
-		else if (linelocation == LINELOCATION::CORNER_BOTTOM_RIGHT || linelocation == LINELOCATION::CORNER_BOTTOM_LEFT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = 0;
-		}
-		else if (linelocation == LINELOCATION::UNKNOWN){
-			targetVelocity = NORMAL_SPEED;
-			// use ultrasonics now
-			if (leftDistance <= 30 && rightDistance > 30){
-				// left
-				targetDir_r_field = 90;
-			}
-			else if (leftDistance > 30 && rightDistance <= 30){
-				// right
-				targetDir_r_field = -90;
-			}
-			else if (leftDistance <= 30 && rightDistance <= 30){
-				// top or bottom
-				if (backDistance <= 25){
-					// bottom
-					targetDir_r_field = 0;
-				}
-				else{
-					// top
-					targetDir_r_field = 180;
+		if (linelocation != LINELOCATION::UNKNOWN){
+			if (betweenDirBoundaries(tsopAngle_r_field)){
+				getOrbit();
+				if (!betweenDirBoundaries(targetDir_r_field)){
+					// oh no orbit won't work. But ball is in field!
+					if (linelocation == LINELOCATION::SIDE_LEFT ||
+						linelocation == LINELOCATION::SIDE_RIGHT){
+						// we're on the side
+						if (abs(tsopAngle_r_field) < 90){
+							// just chase ball
+							targetDir_r_field = tsopAngle_r_field;
+						}
+						else{
+							// ball behind us. Do front orbit
+							getOrbit(true); // front orbit
+							if (!betweenDirBoundaries(targetDir_r_field)){
+								// should never get here
+								targetVelocity = 0;
+								targetDir_r_field = 0;
+							}
+						}
+					}
+					else{
+						// we're in some corner => just try to chase the ball 
+						targetDir_r_field = tsopAngle_r_field;
+						if (!betweenDirBoundaries(targetDir_r_field)){
+							// ???
+							// don't know what to do in this situation
+							// just get out of the corner
+						}
+						switch(linelocation){
+							case LINELOCATION::SIDE_TOP:            targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
+							case LINELOCATION::SIDE_BOTTOM:         targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
+							case LINELOCATION::CORNER_TOP_RIGHT:    targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
+							case LINELOCATION::CORNER_TOP_LEFT:     targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
+							case LINELOCATION::CORNER_BOTTOM_RIGHT: targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
+							case LINELOCATION::CORNER_BOTTOM_LEFT:  targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
+						}		
+					}
 				}
 			}
 			else{
-				// we're screwed
-				targetVelocity = 0;
-				targetDir_r_field = 0;
+				// ball is out
+				playDefense();	
 			}
+		}
+		else{
+			// unknown
+			targetVelocity = 0;
+			targetDir = 0;
 		}
 	}
 	else if (playMode == DEFENSE){
-		if (linelocation == LINELOCATION::FIELD){
-			// check ultrasonics work
-			int forwardV = 0, sideV = 0;
-			
-			if (leftDistance != 255 && rightDistance != 255){
-				sideV = 2*(rightDistance - leftDistance);
-			}
-			if (backDistance != 255){
-				if (backDistance > 30){
-					forwardV = -100;
-				}
-				else if (backDistance < 15){
-					forwardV = 100;
-				}
-			}
-			targetDir_r_field = (int16_t)(atan2(sideV, forwardV)*180/PI);
-			targetVelocity = 50;
-		}
-		else if (linelocation == LINELOCATION::SIDE_RIGHT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = -90;
-		}
-		else if (linelocation == LINELOCATION::SIDE_LEFT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = 90;
-		}
-		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT || linelocation == LINELOCATION::CORNER_TOP_LEFT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = 180;
-		}
-		else if (linelocation == LINELOCATION::CORNER_BOTTOM_RIGHT || linelocation == LINELOCATION::CORNER_BOTTOM_LEFT){
-			targetVelocity = NORMAL_SPEED;
-			targetDir_r_field = 0;
-		}
-		else if (linelocation == LINELOCATION::UNKNOWN){
-			targetVelocity = 0;
-			targetDir_r_field = 0;
-			// // use ultrasonics now
-			// if (leftDistance <= 30 && rightDistance > 30){
-			// 	// left
-			// }
-			// else if (leftDistance > 30 && rightDistance <= 30){
-			// 	// right
-			// }
-			// else if (leftDistance <= 30 && rightDistance <= 30){
-			// 	// top or bottom
-			// 	if (backDistance <= 30){
-			// 		// bottom
-			// 	}
-			// 	else{
-			// 		// top
-			// 	}
-			// }
-			// else{
-			// 	// we're screwed
-			// }
-			// linelocation = linelocation_prev;
-		}
+		playDefense();	
 	}
 	else{
 		// ???
@@ -1162,6 +1200,50 @@ extern "C" int main(void){
 			else{
 				linelocation = LINELOCATION::UNKNOWN;
 			}
+		}
+
+		// bearing boundaries
+		switch (linelocation){
+			case LINELOCATION::FIELD:
+				dirBoundaries[0] = -180;
+				dirBoundaries[1] = 180;
+				break;
+			case LINELOCATION::SIDE_LEFT:
+				dirBoundaries[0] = -180;
+				dirBoundaries[1] = 0;
+				break;
+			case LINELOCATION::SIDE_RIGHT:
+				dirBoundaries[0] = 0;
+				dirBoundaries[1] = 180;
+				break;
+			case LINELOCATION::CORNER_TOP_LEFT:
+				dirBoundaries[0] = 90;
+				dirBoundaries[1] = 180;
+				break;
+			case LINELOCATION::CORNER_TOP_RIGHT:
+				dirBoundaries[0] = -180;
+				dirBoundaries[1] = -90;
+				break;
+			case LINELOCATION::CORNER_BOTTOM_LEFT:
+				dirBoundaries[0] = 0;
+				dirBoundaries[1] = 90;
+				break;
+			case LINELOCATION::CORNER_BOTTOM_RIGHT:
+				dirBoundaries[0] = -90;
+				dirBoundaries[1] = 90;
+				break;
+			case LINELOCATION::SIDE_TOP:
+				dirBoundaries[0] = 90;
+				dirBoundaries[1] = -90;
+				break;
+			case LINELOCATION::SIDE_BOTTOM:
+				dirBoundaries[0] = -90;
+				dirBoundaries[1] = 90;
+				break;
+			case LINELOCATION::UNKNOWN:
+				dirBoundaries[0] = -180;
+				dirBoundaries[1] = 180;
+				break;
 		}
 
 		/* tsops */
