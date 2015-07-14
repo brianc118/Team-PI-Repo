@@ -265,7 +265,7 @@ extern "C" int main(void){
 	slave1.lightArray.init();
 	slave1.imu.init();
 	//slave1.imu.calibGyroDrift();
-	//calibIMUOffset();
+	calibIMUOffset();
 	//slave1.imu.calibOffset();
 	//calibMag();
 	while(1){   // Equivalent of the Arduino loop()
