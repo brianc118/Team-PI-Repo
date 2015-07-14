@@ -1297,3 +1297,16 @@ extern "C" int main(void){
 		linelocation_prev = linelocation;
 	}
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+  void startup_early_hook() {
+    WDOG_TOVALL = (1000); // The next 2 lines sets the time-out value. This is the value that the watchdog timer compare itself to.
+    WDOG_TOVALH = 0;
+    WDOG_STCTRLH = (WDOG_STCTRLH_ALLOWUPDATE | WDOG_STCTRLH_WDOGEN | WDOG_STCTRLH_WAITEN | WDOG_STCTRLH_STOPEN); // Enable WDG
+    //WDOG_PRESC = 0; // prescaler 
+  }
+#ifdef __cplusplus
+}
+#endif
