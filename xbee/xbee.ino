@@ -7,7 +7,7 @@ void setup() {
   // put your setup code here, to run once:
   pinMode(led, OUTPUT);
   Serial.begin(9600);
-  Serial3.begin(9600);
+  Serial3.begin(57600);
 }
 
 void loop() {
