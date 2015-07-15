@@ -191,7 +191,6 @@ uint32_t ledBlinkTime = 500;
 
 extern "C" int main(void){
 	CORE_PIN33_CONFIG = 0;  // completely disables the pin
-	noInterrupts();
 	Serial.begin(115200);
 
 	pinMode(LED, OUTPUT);
@@ -240,12 +239,20 @@ extern "C" int main(void){
 	analogWriteFrequency(MT_C_PWM, PWM_FREQ);
 	analogWriteFrequency(MT_D_PWM, PWM_FREQ);
 	analogWriteFrequency(MT_E_PWM, PWM_FREQ);
+
+	// MOVEMOTOR(0, MT_A_DIR, MT_A_BRK, MT_A_PWM);
+	// MOVEMOTOR(0, MT_B_DIR, MT_B_BRK, MT_B_PWM);
+	// MOVEMOTOR(0, MT_C_DIR, MT_C_BRK, MT_C_PWM);
+	// MOVEMOTOR(0, MT_D_DIR, MT_D_BRK, MT_D_PWM);
+	// MOVEMOTOR(0, MT_E_DIR, MT_E_BRK, MT_E_PWM);
 	
 	// for fastest speeds configure 8 bit analog reads and no averaging
 	analogReadResolution(8);
 	analogReadAveraging(32);
 
 	ledBlinkTime = 0;
+
+	noInterrupts();
 
 	SPI.begin_SLAVE(ALT_SCK, MOSI, MISO, ALT_CS0);
   	SPI.setCTAR_SLAVE(8, SPI_MODE0);
@@ -348,6 +355,7 @@ void spi0_isr(){
 	noInterrupts();
 	if (dataExpected == 0){
 		command = SPI0_POPR;
+		Serial.println(command);
 		CLEARARRAY(spiBuff);
 
 		switch(command){
