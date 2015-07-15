@@ -1102,11 +1102,26 @@ extern "C" int main(void){
 		tft.println("FT6206 connected");
 	}
 
+	delay(450);
+
 	Slave1.begin(115200);
 	Slave2.begin();
 	Slave3.begin();
 	Serial.println("Slaves connected");
 	tft.println("Slaves connected");
+
+	Wire.beginTransmission(PIXY1_ADDRESS);
+	if (Wire.endTransmission() != 0){
+		pixyEnabled = false;
+		Serial.println("pixy disconnected");
+		tft.println("pixy disconnected");
+	}
+	else{
+		Serial.println("pixy connected");
+		tft.println("pixy connected");
+	}
+
+	delay(50);
 
 	pinMode(LED, OUTPUT);
 	pinMode(LASER_SIG, INPUT);
