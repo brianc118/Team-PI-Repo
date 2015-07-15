@@ -1085,7 +1085,7 @@ extern "C" int main(void){
 	SPI.setSCK(14);
 	SPI.begin();	
 
-	delay(1000);
+	delay(500);
 
 	kickDog();
 
