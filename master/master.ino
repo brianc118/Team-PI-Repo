@@ -165,7 +165,7 @@ elapsedMillis capChargedTime = 0;
 /*					     Camera   						  */
 /**********************************************************/
 
-//#define PIXY_ENABLED
+bool pixyEnabled = true;
 
 #define PIXY1_ADDRESS 0x54   // default i2c address
 
@@ -1131,9 +1131,9 @@ extern "C" int main(void){
 		// save some time here as reading srf08's has seen to dramatically decrease performance
 		switch(loopCount % 5){
 			case 0: 
-#ifdef PIXY_ENABLED
-				blocks = pixy1.getBlocks();
-#endif
+				if (pixyEnabled){
+					blocks = pixy1.getBlocks();
+				}
 				break;
 			case 1: srfBack.getRangeIfCan(backDistance); break;
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
@@ -1253,10 +1253,11 @@ extern "C" int main(void){
 		/* end tsops */
 
 		/* goal detection */
-#ifdef PIXY_ENABLED
-		getGoalData();
+		if (pixyEnabled){
+			getGoalData();
+		}
 		/* end goal detection */
-#endif
+
 		/* face forwards */
 		if (goalDetected){
 			targetBearing = goalAngle_r_field * 1.3; // always face goals
