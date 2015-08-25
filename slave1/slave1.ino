@@ -32,7 +32,8 @@
 // the higher the value of COMPCONSTANT, the more gyro data is used
 // COMPCONSTANT = t/(t+T) where t is the 't' is the time constant and T is the sample period
 // the time constant is essentially how long we should keep the gyro data for before magnetometer data overules
-#define COMPCONSTANT 0.995
+//#define COMPCONSTANT 0.9995
+#define COMPCONSTANT 0.98
 
 #define INDEX1 1
 #define INDEX2 2
@@ -59,6 +60,7 @@ float bearing_offset = 0;
 uint8_t outBuffer[24] = {0};
 
 uint8_t frontSum, backSum, rightSum, leftSum;
+uint8_t frSum, flSum, brSum, blSum;
 uint8_t lightByte = 0x00;
 
 inline void commandRequestStandardPacket();
@@ -82,36 +84,36 @@ void calibIMUOffset(){
 	bearing_offset /= 50;
 }
 
-void calibLight(){
-	Serial.println("place on white");
-	while(!Serial.available()){};
-	CLEARSERIAL();
+// void calibLight(){
+// 	Serial.println("place on white");
+// 	while(!Serial.available()){};
+// 	CLEARSERIAL();
 
-	slave1.lightArray.calibWhite();
-	PRINTARRAY(slave1.lightArray.white);
-	Serial.println("place on green");
+// 	slave1.lightArray.calibWhite();
+// 	PRINTARRAY(slave1.lightArray.white);
+// 	Serial.println("place on green");
 
-	while(!Serial.available()){};
-	CLEARSERIAL();
+// 	while(!Serial.available()){};
+// 	CLEARSERIAL();
 
-	slave1.lightArray.calibGreen();
-	slave1.lightArray.endCalib();
-	PRINTARRAY(slave1.lightArray.green);
-	Serial.println();
-	Serial.println("calibrated references values");
-	PRINTARRAY(slave1.lightArray.refData);
-	Serial.print("bad light sensors: ");
-	for (int i = 0; i < 16; i++){
-		if (slave1.lightArray.refData[i] == 255){
-			Serial.print(i + 1);
-			Serial.print('\t');
-		}
-	}
-	Serial.println();
-	Serial.println("Send anything to continue");
-	while(!Serial.available()){};
-	CLEARSERIAL();
-}
+// 	slave1.lightArray.calibGreen();
+// 	slave1.lightArray.endCalib();
+// 	PRINTARRAY(slave1.lightArray.green);
+// 	Serial.println();
+// 	Serial.println("calibrated references values");
+// 	PRINTARRAY(slave1.lightArray.refData);
+// 	Serial.print("bad light sensors: ");
+// 	for (int i = 0; i < 16; i++){
+// 		if (slave1.lightArray.refData[i] == 255){
+// 			Serial.print(i + 1);
+// 			Serial.print('\t');
+// 		}
+// 	}
+// 	Serial.println();
+// 	Serial.println("Send anything to continue");
+// 	while(!Serial.available()){};
+// 	CLEARSERIAL();
+// }
 
 void calibMag(){
 	elapsedMillis elpsdPrintTime = 0;
@@ -168,40 +170,135 @@ void lightCalcs(){
 	lightByte = 0x00;
 
 	// now lightbyte is one of 16 possible values
-	if (abs(bearing) <= 45){
+	if (abs(bearing) <= 25){
 		// we're facing forwards
 		frontSum = slave1.lightArray.armFrontSum;
 		backSum  = slave1.lightArray.armBackSum;
 		rightSum = slave1.lightArray.armRightSum;
 		leftSum  = slave1.lightArray.armLeftSum;
+		getFrontalLocation();
 	}
-	else if (bearing > 90 - 45 && bearing <= 90 + 45){
+	else if (bearing > 90 - 22.5 && bearing <= 90 + 22.5){
 		// facing right
 		rightSum = slave1.lightArray.armFrontSum;
 		leftSum  = slave1.lightArray.armBackSum;
 		backSum  = slave1.lightArray.armRightSum;
 		frontSum = slave1.lightArray.armLeftSum;
+		getFrontalLocation();
 	}
-	else if (bearing < -90 + 45  && bearing >= -90 - 45){
+	else if (bearing < -90 + 22.5  && bearing >= -90 - 22.5){
 		// facing left
 		leftSum = slave1.lightArray.armFrontSum;
 		rightSum  = slave1.lightArray.armBackSum;
 		frontSum = slave1.lightArray.armRightSum;
 		backSum  = slave1.lightArray.armLeftSum;
+		getFrontalLocation();
 	}
-	else if ((bearing < -180 + 45 && bearing >= 180)||(bearing > 180 - 45)){
+	else if ((bearing < -180 + 22.5 && bearing >= 180)||(bearing > 180 - 22.5)){
 		// facing back
 		backSum   = slave1.lightArray.armFrontSum;
 		frontSum = slave1.lightArray.armBackSum;
 		leftSum   = slave1.lightArray.armRightSum;
 		rightSum = slave1.lightArray.armLeftSum;
+		getFrontalLocation();
 	}
+	else{
+		if (bearing > 45 - 22.5 && bearing <= 45 + 22.5){
+			frSum = slave1.lightArray.armFrontSum;
+			brSum = slave1.lightArray.armRightSum;
+			blSum = slave1.lightArray.armBackSum;
+			flSum = slave1.lightArray.armLeftSum;
+		}
+		else if (bearing > 135 - 22.5 && bearing <= 135 + 22.5){
+			frSum = slave1.lightArray.armLeftSum;
+			brSum = slave1.lightArray.armFrontSum;
+			blSum = slave1.lightArray.armRightSum;
+			flSum = slave1.lightArray.armBackSum;	
+		}
+		else if (bearing < -45 + 22.5 && bearing >= -45 - 22.5){
+			frSum = slave1.lightArray.armRightSum;
+			brSum = slave1.lightArray.armBackSum;
+			blSum = slave1.lightArray.armLeftSum;
+			flSum = slave1.lightArray.armFrontSum;		
+		}
+		else if (bearing < -135 + 22.5 && bearing >= -135 - 22.5){
+			frSum = slave1.lightArray.armBackSum;
+			brSum = slave1.lightArray.armLeftSum;
+			blSum = slave1.lightArray.armFrontSum;
+			flSum = slave1.lightArray.armRightSum;
+		}
+		getDiagonalLocation();
+	}
+}
 
-	if (frontSum > 0){ lightByte = lightByte | INDEX1; Serial.print('f');  }
-	if (backSum > 0){  lightByte = lightByte | INDEX2; Serial.print('b');  } 
-	if (rightSum > 0){ lightByte = lightByte | INDEX3; Serial.print('r');  }
-	if (leftSum > 0){  lightByte = lightByte | INDEX4; Serial.print('l');}
-	Serial.println();
+void getDiagonalLocation(){
+	if (frSum > 0){ lightByte = lightByte | INDEX1;   }
+	if (brSum > 0){  lightByte = lightByte | INDEX2;   } 
+	if (blSum > 0){ lightByte = lightByte | INDEX3;   }
+	if (flSum > 0){  lightByte = lightByte | INDEX4; }
+
+	switch (lightByte){
+		case 0: /*nothing*/
+			slave1.lineLocation = LINELOCATION::FIELD;
+			break;
+		case 1:
+			slave1.lineLocation = LINELOCATION::SIDE_RIGHT;
+			break;
+		case 2:
+			slave1.lineLocation = LINELOCATION::SIDE_RIGHT;
+			break;
+		case 3:
+			slave1.lineLocation = LINELOCATION::SIDE_RIGHT;
+			break;
+		case 4:
+			slave1.lineLocation = LINELOCATION::SIDE_LEFT;
+			break;
+		case 5:
+			slave1.lineLocation = LINELOCATION::UNKNOWN;\
+			break;
+		case 6:
+			slave1.lineLocation = LINELOCATION::SIDE_BOTTOM;
+			break;
+		case 7:
+			slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_RIGHT;
+			break;
+		case 8:
+			slave1.lineLocation = LINELOCATION::SIDE_LEFT;
+			break;
+		case 9:
+			slave1.lineLocation = LINELOCATION::SIDE_TOP;
+			break;
+		case 10: 
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+		case 11:
+			slave1.lineLocation = LINELOCATION::CORNER_TOP_RIGHT;
+			break;
+		case 12:
+			slave1.lineLocation = LINELOCATION::SIDE_LEFT;
+			break;
+		case 13:
+			slave1.lineLocation = LINELOCATION::CORNER_TOP_LEFT;
+			break;
+		case 14:
+			slave1.lineLocation = LINELOCATION::CORNER_BOTTOM_LEFT;
+			break;
+		case 15:
+			slave1.lineLocation = LINELOCATION::UNKNOWN;
+			break;
+	}
+}
+
+void getFrontalLocation(){
+	// if (frontSum > 0){ lightByte = lightByte | INDEX1; Serial.print('f');  }
+	// if (backSum > 0){  lightByte = lightByte | INDEX2; Serial.print('b');  } 
+	// if (rightSum > 0){ lightByte = lightByte | INDEX3; Serial.print('r');  }
+	// if (leftSum > 0){  lightByte = lightByte | INDEX4; Serial.print('l');}
+	if (frontSum > 0){ lightByte = lightByte | INDEX1;   }
+	if (backSum > 0){  lightByte = lightByte | INDEX2;   } 
+	if (rightSum > 0){ lightByte = lightByte | INDEX3;   }
+	if (leftSum > 0){  lightByte = lightByte | INDEX4; }
+	//Serial.println();
 	
 	switch (lightByte){
 		case 0: /*nothing*/ 
@@ -254,6 +351,7 @@ void lightCalcs(){
 			break;
 	}
 }
+
 extern "C" int main(void){	
 	CORE_PIN33_CONFIG = 0;  // completely disables the pin
 
@@ -264,8 +362,9 @@ extern "C" int main(void){
 	delay(200);
 	slave1.lightArray.init();
 	slave1.imu.init();
-	//slave1.imu.calibGyroDrift();
+	//delay(200);
 	calibIMUOffset();
+	slave1.imu.calibGyro();
 	//slave1.imu.calibOffset();
 	//calibMag();
 	while(1){   // Equivalent of the Arduino loop()
@@ -293,7 +392,7 @@ extern "C" int main(void){
 				CLEARSERIAL();
 
 				Serial.println("\n\n\n------------------------------");
-				calibLight();
+				//calibLight();
 			}
 			else{
 				Serial.println("ENTER VALID COMMAND");
@@ -335,11 +434,17 @@ extern "C" int main(void){
 	    		case SLAVE1_COMMANDS::CALIB_MAG:
 	    			calibMagRequest(); // note that for this command another END_CALIB_MAG command must be sent to finish
 	    			break;
-	    		case SLAVE1_COMMANDS::CALIB_GREEN:
-	    			slave1.lightArray.calibGreen();
+	    		case SLAVE1_COMMANDS::CALIB_GREEN_V:
+	    			slave1.lightArray.calibGreenV();
 	    			break;
-	    		case SLAVE1_COMMANDS::CALIB_WHITE:
-	    			slave1.lightArray.calibWhite();
+	    		case SLAVE1_COMMANDS::CALIB_WHITE_V:
+	    			slave1.lightArray.calibWhiteV();
+	    			break;
+	    		case SLAVE1_COMMANDS::CALIB_GREEN_H:
+	    			slave1.lightArray.calibGreenH();
+	    			break;
+	    		case SLAVE1_COMMANDS::CALIB_WHITE_H:
+	    			slave1.lightArray.calibWhiteH();
 	    			break;
 	    		case SLAVE1_COMMANDS::END_CALIB_LIGHT:
 	    			slave1.lightArray.endCalib();

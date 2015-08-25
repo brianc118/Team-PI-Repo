@@ -8,6 +8,7 @@
  */
 
 #include <WProgram.h>
+#include <EEPROM.h>
 #include <i2c_t3.h>
 #include <SPI.h>
 #include <ILI9341_t3.h>
@@ -26,8 +27,15 @@
  
 #define LED 13
 
-#define SUPER_SPEED 170
-#define NORMAL_SPEED 130
+// #define SUPER_SPEED 150
+// #define NORMAL_SPEED 100
+// #define LINE_SPEED 80
+bool avoidMode = false;
+
+uint8_t superSpeed;
+uint8_t normalSpeed;
+uint8_t lineSpeed;
+uint8_t varSpeed_enabled;
 
 uint32_t loopCount = 0;
 
@@ -44,7 +52,8 @@ uint32_t ledBlinkTime = 500;
 #define DEFENSE 1
 #define UNDECIDED 2
 
-uint8_t playMode = UNDECIDED;
+uint8_t playMode = OFFENSE;
+bool playModeBool = true;
 
 bool powerOn = true;
 
@@ -90,7 +99,8 @@ BUTTON tftEnableBtn(&tft, &touchedPoint);
 BUTTON magBtn(&tft, &touchedPoint);
 BUTTON ltBtn(&tft, &touchedPoint);
 BUTTON kickBtn(&tft, &touchedPoint);
-BUTTON spinBtn(&tft, &touchedPoint);
+BUTTON speedBtn(&tft, &touchedPoint);
+BUTTON playModeBtn(&tft, &touchedPoint);
 
 bool kickMode = false;
 
@@ -118,6 +128,7 @@ uint8_t targetVelocity;
 bool inFrontOrbitMode = false;
 
 /**********************************************************/
+#define BOUNDARY_OFFSET 45
 float dirBoundaries[2] = {-180, 180};
 
 
@@ -126,8 +137,8 @@ float dirBoundaries[2] = {-180, 180};
 /**********************************************************/
 // for speed 130, 1.0, 0.1
 // for speed 170, 
-#define BEARING_KP 0.7
-#define BEARING_KD 0.1
+#define BEARING_KP 1.2
+#define BEARING_KD 0.2
 #define ROTATIONCORRECTION_MAX 70
 
 int32_t targetBearing = 0;
@@ -148,7 +159,7 @@ int16_t backspinSpeed = 0;
 /*                       Kicker                           */
 /**********************************************************/
 #define KICK_TIME 4000
-#define KICK_MODE_KICK_TIME 15000
+#define KICK_MODE_KICK_TIME 6000
 #define KICK_DELAY 30
 #define KICK_DURATION 90
 
@@ -169,7 +180,7 @@ bool pixyEnabled = true;
 
 #define PIXY1_ADDRESS 0x54   // default i2c address
 
-#define MIN_BLOCK_AREA   1000
+#define MIN_BLOCK_AREA 1000
 
 PixyI2C pixy1(PIXY1_ADDRESS);
 
@@ -189,12 +200,14 @@ bool goalDetected = false;
 #define SRF_BACK_ADDRESS  0x70  // 0xE0
 #define SRF_RIGHT_ADDRESS 0x71  // 0xE2
 #define SRF_LEFT_ADDRESS  0x72  // 0xE4
+#define SRF_FRONT_ADDRESS 0x73  // 0xE6
 
 SRF08 srfBack(SRF_BACK_ADDRESS);
 SRF08 srfRight(SRF_RIGHT_ADDRESS);
 SRF08 srfLeft(SRF_LEFT_ADDRESS);
+SRF08 srfFront(SRF_FRONT_ADDRESS);
 
-int16_t backDistance, rightDistance, leftDistance;
+int16_t backDistance, rightDistance, leftDistance, frontDistance;
 
 /**********************************************************/
 /*					       TSOPS    					  */
@@ -221,10 +234,12 @@ int laserSig = 0;
 bool ballInZone = false;
 
 void kickDog() {
-	noInterrupts();
-	WDOG_REFRESH = 0xA602;
-	WDOG_REFRESH = 0xB480;
-	interrupts();
+	if (false){
+		noInterrupts();
+		WDOG_REFRESH = 0xA602;
+		WDOG_REFRESH = 0xB480;
+		interrupts();
+	}
 }
 
 void resetOtherRobotData(){
@@ -241,12 +256,6 @@ void rx(){
 	otherRobot_tsopAngle  = (rx_packet[2] << 8) | rx_packet[3];
 	otherRobot_lineLocation = rx_packet[4];
 	otherRobot_powerOn = rx_packet[5];
-	// Serial.print(micros()); Serial.print('\t');
-	// Serial.print(otherRobot_playMode); Serial.print('\t');
-	// Serial.print(otherRobot_tsopStrength); Serial.print('\t');
-	// Serial.print(otherRobot_tsopAngle); Serial.print('\t');
-	// Serial.print(otherRobot_lineLocation); Serial.print('\t');
-	// Serial.println(otherRobot_powerOn);
 }
 
 void tx(){
@@ -275,6 +284,7 @@ void xbeeTryTxRx(){
 			}
 			if(rx_i == 6){
 				rx();
+
 				tx();
 				rx_elapsed = 0;
 				xbeeConnected = true;
@@ -287,7 +297,8 @@ void xbeeTryTxRx(){
 	if(rx_elapsed >= XBEE_TIMEOUT){
 		rx_elapsed = 0;
 		xbeeConnected = false;
-		resetOtherRobotData();
+		//resetOtherRobotData();
+		//EEPROM.write(111, xbeeConnected);		
 		tx(); // try to transmit just in case the other hasn't received
 	}
 }
@@ -295,7 +306,8 @@ void xbeeTryTxRx(){
 void getPlayMode(){
 	if (!xbeeConnected || !otherRobot_powerOn){
 		// other robot not connected or 15v not on
-		playMode = OFFENSE;
+		//playMode = EEPROM.read(111);
+		playMode = EEPROM.read(111);
 	}
 	else{
 		int a = 0, b = 0;
@@ -307,7 +319,7 @@ void getPlayMode(){
 		else if (tsopStrength > 130){
 			a+=4;
 		}
-		else if (tsopStrength > 70){
+		else if (tsopStrength > 20){
 			a+=1;
 		}
 		if (otherRobot_tsopStrength > 150){
@@ -316,7 +328,7 @@ void getPlayMode(){
 		else if (otherRobot_tsopStrength > 130){
 			b+=4;
 		}
-		else if (otherRobot_tsopStrength > 70){
+		else if (otherRobot_tsopStrength > 20){
 			b+=1;
 		}
 		if (a > b){
@@ -341,8 +353,17 @@ void getPlayMode(){
 					playMode = DEFENSE;
 				}
 			}
-		}		
+			else{
+				if (abs(tsopAngle) < abs(otherRobot_tsopAngle)){
+					playMode = OFFENSE;
+				}
+				else{
+					playMode = DEFENSE;
+				}
+			}
+		}
 	}
+	//playMode = DEFENSE;
 }
 
 
@@ -354,6 +375,7 @@ bool betweenDirBoundaries(float a){
 void getOrbit(bool frontOrbit = false){
 	// regardless of input, if inFrontOrbitMode, then must be front orbit
 	// check if front orbit complete
+
 	if (frontOrbit){
 		// check if you can actually front orbit
 		frontOrbit = abs(tsopAngle_r_targetBearing) > 90;
@@ -363,35 +385,31 @@ void getOrbit(bool frontOrbit = false){
 	}
 
 	if (!frontOrbit && !inFrontOrbitMode){
-		targetVelocity = NORMAL_SPEED;
-
-		if (tsopStrength > 148){
+		if (tsopStrength > 143){
 			orbit_k = 1.0;
-			orbit_l = 0.5;
+			orbit_l = 0.6;
 		}
 		else if (tsopStrength > 140){
 			orbit_k = 0.9;
-			orbit_l = 0.4;
+			orbit_l = 0.5;
 		}
 		else if (tsopStrength > 135){
 			orbit_k = 0.8;
-			orbit_l = 0.3;
+			orbit_l = 0.4;
 		}
 		else if (tsopStrength > 130){
-			orbit_k = 0.7;
-			orbit_l = 0.2;
+			orbit_k = 0.8;
+			orbit_l = 0.3;
 		}
 		else if (tsopStrength > 120){
-			orbit_k = 0.6;
-			orbit_l = 0.1;
+			orbit_k = 0.75;
+			orbit_l = 0.15;
 		}
 		else if (tsopStrength > 100){
-			targetVelocity = SUPER_SPEED;
-			orbit_k = 0.55;
+			orbit_k = 0.6;
 			orbit_l = 0.05;
 		}
-		else if (tsopStrength > 70){
-			targetVelocity = SUPER_SPEED;
+		else if (tsopStrength > 20){
 			orbit_k = 0.5;
 			orbit_l = 0;
 		}
@@ -404,13 +422,29 @@ void getOrbit(bool frontOrbit = false){
 
 		targetDir_r_field = (270 - abs(tsopAngle_r_targetBearing * orbit_k)) / 90 * tsopAngle_r_targetBearing * orbit_k;
 
+		Serial.print("targetDir_r_field\t");
+		Serial.print(targetDir_r_field);
+
 		diff = targetDir_r_field - tsopAngle_r_targetBearing;
 		diffComp = SIGN(tsopAngle_r_targetBearing) * minDiff - diff;
 
-		if (abs(diffComp) > minDiff){
+		Serial.print("orbit_k\t");
+		Serial.print(orbit_k);
+		Serial.print("orbit_l\t");
+		Serial.print(orbit_l);
+		Serial.print("mindiff\t");
+		Serial.print(minDiff);
+		Serial.print('\t');
+		Serial.print("diffComp\t");
+		Serial.print(diffComp);
+
+		if (abs(tsopAngle_r_targetBearing) > minDiff){
 			// need to cut down
 			targetDir_r_field = tsopAngle_r_targetBearing + diff + orbit_l * diffComp;
+			Serial.print("aaa\t");
 		}
+		Serial.print("targetDir_r_field\t");
+		Serial.println(targetDir_r_field);
 	}
 	else{
 		if (tsopAngle_r_targetBearing > 0){
@@ -423,103 +457,185 @@ void getOrbit(bool frontOrbit = false){
 	}
 	TOBEARING180(targetDir_r_field);
 
-	if (targetDir_r_field < -170 || targetDir_r_field > 170){
-		targetVelocity = SUPER_SPEED;
+	// get velocity
+	if (linelocation == LINELOCATION::FIELD){
+		
+		if (leftDistance < 80 && targetDir < -80 && targetDir > -120){
+			targetVelocity = lineSpeed;
+		}
+		else if (rightDistance < 80 && targetDir > 80 && targetDir < 120){
+			targetVelocity = lineSpeed;
+		}
+		else if (backDistance < 80 && (targetDir < -150 || targetDir > 150)){
+			targetVelocity = lineSpeed;
+		}
+		else if (frontDistance < 45 && abs(targetDir) < 60){
+			targetVelocity = lineSpeed;
+		}
+		else{
+			if (tsopStrength > 100){
+				targetVelocity = normalSpeed;
+			}
+			else{
+				targetVelocity = superSpeed;
+			}
+			// back speed
+			if (targetDir_r_field < -170 || targetDir_r_field > 170 && backDistance > 40){
+				targetVelocity = superSpeed;
+			}
+		}	
 	}
+	else{
+		targetVelocity = lineSpeed;
+	}
+
 }
 
 void playDefense(){
 	int forwardV = 0, sideV = 0;
-	
-	if (tsopStrength > 70){
-		// move to ball
-		if (tsopAngle_r_field > 5){
-			// ball on right.
-			sideV = 100;
+
+	int backDistanceOffset;
+
+	// if (leftDistance != 255 && rightDistance != 255){
+	// 	if (leftDistance > 45 && rightDistance > 45){
+	// 		if (tsopStrength > 20){
+	// 		// move to ball
+	// 		sideV = SIGN(tsopAngle_r_field) * 100 + 0.1*(rightDistance - leftDistance);
+	// 		// in front of goal
+	// 		backDistanceOffset = 25;
+	// 	}
+	// 	else{
+		
+	// 		// move to middle
+	// 		backDistanceOffset = 36;
+	// 		sideV = 5*(rightDistance - leftDistance);
+	// 	}
+	// }	
+
+	if (leftDistance != 255 && rightDistance != 255){
+		if (leftDistance > 55 && rightDistance > 55 && backDistance > 20){
+			if (tsopStrength > 20){
+				sideV = SIGN(tsopAngle_r_field) * 100 + 0.0*(rightDistance - leftDistance);
+			}
+			else{
+				sideV = 10*(rightDistance - leftDistance);
+			}
+			backDistanceOffset = 25;
 		}
-		else if (tsopAngle_r_field < -5){
-			sideV = -100;
+		else if (leftDistance <= 55 && rightDistance > 55){
+			// on left side
+			sideV = 180;
+			// backDistanceOffset = 36; // ints
+			backDistanceOffset = 45;
+		}
+		else if (leftDistance > 55 && rightDistance <= 55){
+			sideV = -180;
+			// backDistanceOffset = 36; // ints
+			backDistanceOffset = 45;
 		}
 		else{
+			// backDistanceOffset = 25; // ints
+			backDistanceOffset = 45;
 			sideV = 0;
 		}
 	}
-	else{
-		if (leftDistance != 255 && rightDistance != 255){
-			// move to middle
-			sideV = 2*(rightDistance - leftDistance);
-		}
-	}	
+
+	if (sideV > 255){sideV = 255;}
+	else if (sideV < -255){sideV = -255;}
 
 	if (backDistance != 255){
-		if (backDistance > 30){
-			forwardV = -100;
-		}
-		else if (backDistance < 15){
+		forwardV = 4*(backDistanceOffset - backDistance);
+		if (backDistance < 20){
 			forwardV = 100;
 		}
 	}
+	if (forwardV > superSpeed){
+		forwardV = superSpeed;
+	}
+	
 	targetDir_r_field = (int16_t)(atan2(sideV, forwardV)*180/PI);
-	targetVelocity = NORMAL_SPEED;
+	int v_int_large = sqrt(forwardV * forwardV + sideV * sideV);
+	if (v_int_large > superSpeed){
+		targetVelocity = superSpeed;
+	} 
+	else{
+		targetVelocity = v_int_large;
+	}
 
 	// override if we're on line
 	switch(linelocation){
-		case LINELOCATION::SIDE_LEFT:           targetDir_r_field = 90;  targetVelocity = NORMAL_SPEED; break;
-		case LINELOCATION::SIDE_RIGHT:          targetDir_r_field = -90; targetVelocity = NORMAL_SPEED; break;
-		case LINELOCATION::SIDE_TOP:            targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
-		case LINELOCATION::SIDE_BOTTOM:         targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
-		case LINELOCATION::CORNER_TOP_RIGHT:    targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
-		case LINELOCATION::CORNER_TOP_LEFT:     targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
-		case LINELOCATION::CORNER_BOTTOM_RIGHT: targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
-		case LINELOCATION::CORNER_BOTTOM_LEFT:  targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
+		case LINELOCATION::SIDE_LEFT:           targetDir_r_field = 90;  targetVelocity = normalSpeed; break;
+		case LINELOCATION::SIDE_RIGHT:          targetDir_r_field = -90; targetVelocity = normalSpeed; break;
+		case LINELOCATION::SIDE_TOP:            targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+		case LINELOCATION::SIDE_BOTTOM:         targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
+		case LINELOCATION::CORNER_TOP_RIGHT:    targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+		case LINELOCATION::CORNER_TOP_LEFT:     targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+		case LINELOCATION::CORNER_BOTTOM_RIGHT: targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
+		case LINELOCATION::CORNER_BOTTOM_LEFT:  targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
 	}		
 }
 
 void getMovement(uint8_t playMode){
 	if (playMode == OFFENSE){
+
 		if (linelocation != LINELOCATION::UNKNOWN){
-			if (betweenDirBoundaries(tsopAngle_r_field)){
-				getOrbit();
-				if (!betweenDirBoundaries(targetDir_r_field)){
-					// oh no orbit won't work. But ball is in field!
-					if (linelocation == LINELOCATION::SIDE_LEFT ||
-						linelocation == LINELOCATION::SIDE_RIGHT){
-						// we're on the side
-						if (abs(tsopAngle_r_field) < 90){
-							// just chase ball
-							targetDir_r_field = tsopAngle_r_field;
-						}
-						else{
-							// ball behind us. Do front orbit
-							getOrbit(true); // front orbit
-							if (!betweenDirBoundaries(targetDir_r_field)){
-								// should never get here
-								targetVelocity = 0;
-								targetDir_r_field = 0;
-							}
-						}
-					}
-					else{
-						// we're in some corner => just try to chase the ball 
-						targetDir_r_field = tsopAngle_r_field;
-						if (!betweenDirBoundaries(targetDir_r_field)){
-							// ???
-							// don't know what to do in this situation
-							// just get out of the corner
-						}
-						switch(linelocation){
-							case LINELOCATION::SIDE_TOP:            targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
-							case LINELOCATION::SIDE_BOTTOM:         targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
-							case LINELOCATION::CORNER_TOP_RIGHT:    targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
-							case LINELOCATION::CORNER_TOP_LEFT:     targetDir_r_field = 180; targetVelocity = NORMAL_SPEED; break;
-							case LINELOCATION::CORNER_BOTTOM_RIGHT: targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
-							case LINELOCATION::CORNER_BOTTOM_LEFT:  targetDir_r_field = 0;   targetVelocity = NORMAL_SPEED; break;
-						}		
-					}
+
+			if (betweenDirBoundaries(tsopAngle_r_field) && tsopStrength > 20){
+				switch(linelocation){
+					case LINELOCATION::FIELD:				getOrbit(); break;
+					case LINELOCATION::SIDE_LEFT:           targetDir_r_field = 90;  targetVelocity = normalSpeed; break;
+					case LINELOCATION::SIDE_RIGHT:          targetDir_r_field = -90; targetVelocity = normalSpeed; break;
+					case LINELOCATION::SIDE_TOP:            targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+					case LINELOCATION::SIDE_BOTTOM:         targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
+					case LINELOCATION::CORNER_TOP_RIGHT:    targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+					case LINELOCATION::CORNER_TOP_LEFT:     targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+					case LINELOCATION::CORNER_BOTTOM_RIGHT: targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
+					case LINELOCATION::CORNER_BOTTOM_LEFT:  targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
 				}
+				// getOrbit();
+				// if (!betweenDirBoundaries(targetDir_r_field)){
+				// 	// oh no orbit won't work. But ball is in field!
+				// 	if (linelocation == LINELOCATION::SIDE_LEFT ||
+				// 		linelocation == LINELOCATION::SIDE_RIGHT){
+				// 		// we're on the side
+				// 		if (abs(tsopAngle_r_field) < 90){
+				// 			// just chase ball
+				// 			targetDir_r_field = tsopAngle_r_field;
+				// 		}
+				// 		else{
+				// 			// ball behind us. Do front orbit
+				// 			getOrbit(true); // front orbit
+				// 			if (!betweenDirBoundaries(targetDir_r_field)){
+				// 				// should never get here
+				// 				targetVelocity = 0;
+				// 				targetDir_r_field = 0;
+				// 			}
+				// 		}
+				// 	}
+				// 	else{
+				// 		// we're in some corner => just try to chase the ball 
+				// 		targetDir_r_field = tsopAngle_r_field;
+				// 		if (!betweenDirBoundaries(targetDir_r_field)){
+				// 			// ???
+				// 			// don't know what to do in this situation
+				// 			// just get out of the corner
+				// 			targetVelocity = 0;
+				// 			targetDir_r_field = 0;
+				// 		}
+				// 		switch(linelocation){
+				// 			case LINELOCATION::SIDE_TOP:            targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+				// 			case LINELOCATION::SIDE_BOTTOM:         targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
+				// 			case LINELOCATION::CORNER_TOP_RIGHT:    targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+				// 			case LINELOCATION::CORNER_TOP_LEFT:     targetDir_r_field = 180; targetVelocity = normalSpeed; break;
+				// 			case LINELOCATION::CORNER_BOTTOM_RIGHT: targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
+				// 			case LINELOCATION::CORNER_BOTTOM_LEFT:  targetDir_r_field = 0;   targetVelocity = normalSpeed; break;
+				// 		}
+				// 	}
+
+				// }
 			}
 			else{
-				// ball is out
+				// ball is out or ball not found
 				playDefense();	
 			}
 		}
@@ -589,6 +705,211 @@ void calibIMUOffset(){
 	Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_OFFSET);
 }
 
+void speedInterface(){
+	// stop moving
+	Slave3.moveRobot(0, 0, 0);
+	Slave3.moveMotorE(0);
+
+	tftEnableBtn.erase();
+	ltBtn.erase();
+	magBtn.erase();
+	kickBtn.erase();
+	speedBtn.erase();
+	playModeBtn.erase();
+
+	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
+
+	BUTTON exitBtn(&tft, &touchedPoint);
+	BUTTON spinBtn(&tft, &touchedPoint);
+	BUTTON varSpeed(&tft, &touchedPoint);
+	BUTTON plusNormal(&tft, &touchedPoint);
+	BUTTON minusNormal(&tft, &touchedPoint);
+	BUTTON plusSuper(&tft, &touchedPoint);
+	BUTTON minusSuper(&tft, &touchedPoint);
+	BUTTON plusLine(&tft, &touchedPoint);
+	BUTTON minusLine(&tft, &touchedPoint);
+
+	BUTTON normalText(&tft, &touchedPoint);
+	BUTTON superText(&tft, &touchedPoint);
+	BUTTON lineText(&tft, &touchedPoint);
+
+	BUTTON pixyBtn(&tft, &touchedPoint);
+
+	varSpeed.toggleBorderMode = true;
+	pixyBtn.toggleBorderMode = true;
+
+	spinBtn.setText("SPIN", 3, ILI9341_GREEN);
+	varSpeed.setText("varSp", 3, ILI9341_GREEN);
+	plusNormal.setText("+", 3, ILI9341_GREEN);
+	minusNormal.setText("-", 3, ILI9341_GREEN);
+	plusSuper.setText("+", 3, ILI9341_GREEN);
+	minusSuper.setText("-", 3, ILI9341_GREEN);
+	plusLine.setText("+", 3, ILI9341_GREEN);
+	minusLine.setText("+", 3, ILI9341_GREEN);
+
+	normalText.setText(String(normalSpeed), 3, ILI9341_GREEN);
+	superText.setText(String(superSpeed), 3, ILI9341_GREEN);
+	lineText.setText(String(lineSpeed), 3, ILI9341_GREEN);
+
+	pixyBtn.setText("Pixy", 3, ILI9341_GREEN);
+
+	exitBtn.setBounds(320 - 60, 0, 320, 60);
+	spinBtn.setBounds(0, 180, 107, 240);
+	varSpeed.setBounds(0, 120, 107, 180);
+
+
+	normalText.setBounds(107, 60, 167, 120);
+	superText.setBounds(167, 60, 227, 120);
+	lineText.setBounds(227, 60, 287, 120);
+	plusNormal.setBounds(107, 120, 167, 180);
+	minusNormal.setBounds(107, 180, 167, 240);
+	plusSuper.setBounds(167, 120, 227, 180);
+	minusSuper.setBounds(167, 180, 227, 240);
+	plusLine.setBounds(227, 120, 287, 180);
+	minusLine.setBounds(227, 180, 287, 240);
+
+	pixyBtn.setBounds(0, 60, 107, 120);
+
+	exitBtn.setColour(ILI9341_RED);
+	spinBtn.setColour(tft.color565(50,50,50));
+	varSpeed.setColour(tft.color565(100,100,100));
+	plusNormal.setColour(ILI9341_RED);
+	minusNormal.setColour(ILI9341_YELLOW);
+	plusSuper.setColour(ILI9341_RED);
+	minusSuper.setColour(ILI9341_YELLOW);
+	plusLine.setColour(ILI9341_RED);
+	minusLine.setColour(ILI9341_YELLOW);
+	normalText.setColour(ILI9341_BLACK);
+	superText.setColour(ILI9341_BLACK);
+	lineText.setColour(ILI9341_BLACK);
+	pixyBtn.setColour(ILI9341_BLUE);
+
+	exitBtn.draw();
+	spinBtn.draw();
+	varSpeed.draw();
+	plusNormal.draw();
+	minusNormal.draw();
+	plusSuper.draw();
+	minusSuper.draw();
+	plusLine.draw();
+	minusLine.draw();
+
+	normalText.draw();
+	superText.draw();
+	lineText.draw();
+	
+	pixyBtn.draw();
+
+	if (varSpeed_enabled){
+		touchedPoint.x = 50;
+		touchedPoint.y = 150;
+		varSpeed.checkTouch();
+		touchedPoint.x = 0;
+		touchedPoint.y = 0;
+	}
+
+	if (pixyEnabled){
+		touchedPoint.x = 50;
+		touchedPoint.y = 110;
+		pixyBtn.checkTouch();
+		touchedPoint.x = 0;
+		touchedPoint.y = 0;
+	}
+
+	do{
+		kickDog();
+		getTouch();
+		exitBtn.checkTouch();
+		spinBtn.checkTouch();
+		varSpeed.checkTouch();
+		plusNormal.checkTouch();
+		minusNormal.checkTouch();
+		plusSuper.checkTouch();
+		minusSuper.checkTouch();
+		plusLine.checkTouch();
+		minusLine.checkTouch();
+		pixyBtn.checkTouch();
+
+		if (spinBtn.released){
+			spinMode = !spinMode;
+			kickBtn.enabled = false;
+		}
+		else if (varSpeed.released){
+
+		}
+		else if (plusNormal.released){
+			if (normalSpeed + 15 > 255){
+				normalSpeed = 255;
+			}
+			else{
+				normalSpeed += 15;
+			}
+			normalText.setText(String(normalSpeed), 3, ILI9341_GREEN);
+			normalText.draw();
+		}
+		else if (minusNormal.released){
+			if (normalSpeed - 15 < 0){
+				normalSpeed = 0;
+			}
+			else{
+				normalSpeed -= 15;
+			}
+			normalText.setText(String(normalSpeed), 3, ILI9341_GREEN);
+			normalText.draw();
+		}
+		else if (plusSuper.released){
+			if (superSpeed + 15 > 255){
+				superSpeed = 255;
+			}
+			else{
+				superSpeed += 15;
+			}
+			superText.setText(String(superSpeed), 3, ILI9341_GREEN);
+			superText.draw();
+		}
+		else if (minusSuper.released){
+			if (superSpeed - 15 < 0){
+				superSpeed = 0;
+			}
+			else{
+				superSpeed -= 15;
+			}
+			superText.setText(String(superSpeed), 3, ILI9341_GREEN);
+			superText.draw();
+		}
+		else if (plusLine.released){
+			if (lineSpeed + 15 > 255){
+				lineSpeed = 255;
+			}
+			else{
+				lineSpeed += 15;
+			}
+			lineText.setText(String(lineSpeed), 3, ILI9341_GREEN);
+			lineText.draw();
+		}
+		else if (minusLine.released){
+			if (lineSpeed - 15 < 0){
+				lineSpeed = 0;
+			}
+			else{
+				lineSpeed -= 15;
+			}
+			lineText.setText(String(lineSpeed), 3, ILI9341_GREEN);
+			lineText.draw();
+		}
+		else if (pixyBtn.released){
+			pixyEnabled = !pixyEnabled;
+		}
+	} while(!exitBtn.released);
+	EEPROM.write(10, varSpeed_enabled);
+	EEPROM.write(11, normalSpeed);
+	EEPROM.write(12, superSpeed);
+	EEPROM.write(13, lineSpeed);
+	EEPROM.write(14, pixyEnabled);
+	initDebugTFT();
+	drawButtons();
+}
+
 void calibLight(){
 	// stop moving
 	Slave3.moveRobot(0, 0, 0);
@@ -598,32 +919,43 @@ void calibLight(){
 	ltBtn.erase();
 	magBtn.erase();
 	kickBtn.erase();
-	spinBtn.erase();
+	speedBtn.erase();
+	playModeBtn.erase();
 
 	tft.fillRect(0, 32, 320, 145, ILI9341_BLACK);
 
 	BUTTON exitBtn(&tft, &touchedPoint);
-	BUTTON greenBtn(&tft, &touchedPoint);
-	BUTTON whiteBtn(&tft, &touchedPoint);
+	BUTTON greenVBtn(&tft, &touchedPoint);
+	BUTTON whiteVBtn(&tft, &touchedPoint);
+	BUTTON greenHBtn(&tft, &touchedPoint);
+	BUTTON whiteHBtn(&tft, &touchedPoint);
 	BUTTON endBtn(&tft, &touchedPoint);
 
-	greenBtn.setText("GREEN", 3, ILI9341_GREEN);
-	whiteBtn.setText("WHITE", 3, ILI9341_GREEN);
+	greenVBtn.setText("G_V", 3, ILI9341_GREEN);
+	whiteVBtn.setText("W_V", 3, ILI9341_GREEN);
+	greenHBtn.setText("G_H", 3, ILI9341_GREEN);
+	whiteHBtn.setText("W_H", 3, ILI9341_GREEN);
 	endBtn.setText("END", 3, ILI9341_GREEN);
 
 	exitBtn.setBounds(360 - 80, 0, 360, 32);
-	greenBtn.setBounds(0, 180, 107, 240);
-	whiteBtn.setBounds(107, 180, 214, 240);
-	endBtn.setBounds(214, 180, 320, 240);
+	greenVBtn.setBounds(0, 180, 64, 240);
+	whiteVBtn.setBounds(62, 180, 128, 240);
+	greenHBtn.setBounds(128, 180, 192, 240);
+	whiteHBtn.setBounds(192, 180, 256, 240);
+	endBtn.setBounds(256, 180, 320, 240);
 
 	exitBtn.setColour(ILI9341_RED);
-	greenBtn.setColour(tft.color565(50,50,50));
-	whiteBtn.setColour(tft.color565(100,100,100));
+	greenVBtn.setColour(tft.color565(50,50,50));
+	whiteVBtn.setColour(tft.color565(100,100,100));
+	greenHBtn.setColour(tft.color565(50,50,50));
+	whiteHBtn.setColour(tft.color565(100,100,100));
 	endBtn.setColour(tft.color565(150,150,150));
 
 	exitBtn.draw();
-	greenBtn.draw();
-	whiteBtn.draw();
+	greenVBtn.draw();
+	whiteVBtn.draw();
+	greenHBtn.draw();
+	whiteHBtn.draw();
 	endBtn.draw();
 
 	tft.setTextSize(1);
@@ -635,15 +967,18 @@ void calibLight(){
 	int greens = 0, whites = 0;
 
 	do{
+		kickDog();
 		getTouch();
 		exitBtn.checkTouch();
-		greenBtn.checkTouch();
-		whiteBtn.checkTouch();
+		greenVBtn.checkTouch();
+		whiteVBtn.checkTouch();
+		greenHBtn.checkTouch();
+		whiteHBtn.checkTouch();
 		endBtn.checkTouch();
 
-		if (greenBtn.released){
-			tft.print("g ");
-			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_GREEN);
+		if (greenVBtn.released){
+			tft.print("gV ");
+			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_GREEN_V);
 			greens++;
 			delay(2);
 			Slave1.requestPacket(SLAVE1_COMMANDS::LIGHT_DATA_GREEN);
@@ -661,9 +996,48 @@ void calibLight(){
 			}
 			tft.println();
 		}
-		else if (whiteBtn.released){
-			tft.print("w ");
-			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_WHITE);
+		else if (whiteVBtn.released){
+			tft.print("wV ");
+			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_WHITE_V);
+			whites++;
+			delay(2);
+			Slave1.requestPacket(SLAVE1_COMMANDS::LIGHT_DATA_WHITE);
+			Slave1.receivePacket(inBuffer, 16, true);		
+			for (int i = 0; i < 16; i++){
+				if (inBuffer[i] < 10){
+					tft.print("  ");
+				}
+				else if (inBuffer[i] <= 100){
+					tft.print(" ");
+				}
+				tft.print(inBuffer[i]);
+				tft.print(" ");
+			}
+			tft.println();
+		}
+		else if (greenHBtn.released){
+			tft.print("gH ");
+			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_GREEN_H);
+			greens++;
+			delay(2);
+			Slave1.requestPacket(SLAVE1_COMMANDS::LIGHT_DATA_GREEN);
+			Slave1.receivePacket(inBuffer, 16, true);
+
+			for (int i = 0; i < 16; i++){
+				if (inBuffer[i] < 10){
+					tft.print("  ");
+				}
+				else if (inBuffer[i] <= 100){
+					tft.print(" ");
+				}
+				tft.print(inBuffer[i]);
+				tft.print(" ");
+			}
+			tft.println();
+		}
+		else if (whiteHBtn.released){
+			tft.print("wH ");
+			Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_WHITE_H);
 			whites++;
 			delay(2);
 			Slave1.requestPacket(SLAVE1_COMMANDS::LIGHT_DATA_WHITE);
@@ -716,6 +1090,7 @@ void calibLight(){
 				}
 			}
 		}
+		kickDog();
 	} while(!exitBtn.released);
 	initDebugTFT();
 	drawButtons();
@@ -740,6 +1115,7 @@ void calibMag(){
 
 	touched = false;
 	while(!touched){
+		kickDog();
 		getTouch();
 		Slave1.requestPacket(SLAVE1_COMMANDS::CALIB_DATA);
 		Slave1.receivePacket(inBuffer, 24, true);
@@ -794,7 +1170,7 @@ void calibMag(){
 	// exit when touched
 	Slave1.requestPacket(SLAVE1_COMMANDS::END_CALIB_MAG);
 	tft.println();
-	tft.println("Calibration complete!");
+	tft.println("Calibratzion complete!");
 
 	initDebugTFT();
 	drawButtons();
@@ -805,7 +1181,7 @@ void getSlave1Data(){
 	Slave1.receivePacket(inBuffer, 7, true);
 	
 	linelocation = inBuffer[6];
-
+	//linelocation = LINELOCATION::FIELD;
 	f2b.b[0] = inBuffer[2];
 	f2b.b[1] = inBuffer[3];
 	f2b.b[2] = inBuffer[4];
@@ -846,7 +1222,7 @@ void getGoalData(){
 
 void getBackspinSpeed(){
 	if (!kicking){
-		if (tsopStrength > 70){
+		if (tsopStrength > 20){
 			if (abs(targetDir) < 60){
 				if (ballInZone){
 					// we're going forwards and we have the ball
@@ -923,29 +1299,33 @@ void drawButtons(){
 	magBtn.setText("MAG", 3, ILI9341_GREEN);
 	ltBtn.setText("LT", 3, ILI9341_GREEN);
 	kickBtn.setText("KICK", 3, ILI9341_GREEN);
-	spinBtn.setText("SPIN", 3, ILI9341_GREEN);
+	speedBtn.setText("SPEED", 3, ILI9341_GREEN);
+	playModeBtn.setText("DEF", 3, ILI9341_GREEN);
 
 	kickBtn.toggleBorderMode = true;
-	spinBtn.toggleBorderMode = true;
+	playModeBtn.toggleBorderMode = true;
 
 	tftEnableBtn.setBounds(320 - 60, 0, 320, 60);
 	magBtn.setBounds(0, 180, 107, 240);
 	ltBtn.setBounds(107, 180, 214, 240);
 	kickBtn.setBounds(214, 180, 320, 240);
-	spinBtn.setBounds(214, 120, 320, 180);
+	speedBtn.setBounds(214, 120, 320, 180);
+	playModeBtn.setBounds(214, 60, 320, 120);
 
 
 	tftEnableBtn.setColour(ILI9341_WHITE);
 	magBtn.setColour(tft.color565(50,50,50));
 	ltBtn.setColour(tft.color565(100,100,100));
 	kickBtn.setColour(tft.color565(150,150,150));
-	spinBtn.setColour(tft.color565(75,75,75));
+	speedBtn.setColour(tft.color565(75,75,75));
+	playModeBtn.setColour(tft.color565(50,50,50));
 
 	tftEnableBtn.draw();
 	magBtn.draw();
 	ltBtn.draw();
 	kickBtn.draw();
-	spinBtn.draw();
+	speedBtn.draw();
+	playModeBtn.draw();
 }
 
 void initDebugTFT(){
@@ -964,6 +1344,7 @@ void initDebugTFT(){
 	tft.println("backDistance");
 	tft.println("rightDistance");
 	tft.println("leftDistance");
+	tft.println("frontDistance");
 	tft.setTextColor(ILI9341_WHITE);
 	tft.println("tsopAngle");
 	tft.println("tsopAngle_r_targetBearing");
@@ -996,6 +1377,7 @@ void debugTFT(){
 	tft.println(backDistance);
 	tft.println(rightDistance);
 	tft.println(leftDistance);
+	tft.println(frontDistance);
 	tft.setTextColor(ILI9341_WHITE);
 	tft.println(tsopAngle);
 	tft.println(tsopAngle_r_targetBearing);
@@ -1085,11 +1467,17 @@ extern "C" int main(void){
 	SPI.setSCK(14);
 	SPI.begin();	
 
+	varSpeed_enabled = EEPROM.read(10);
+	normalSpeed = EEPROM.read(11);
+	superSpeed = EEPROM.read(12);
+	lineSpeed = EEPROM.read(13);
+	pixyEnabled = EEPROM.read(14);
+
 	delay(500);
 
 	kickDog();
 
-	XBEE.begin(57600);
+	//XBEE.begin(9600);
 	tft.begin();
 	drawPiLogo();
 
@@ -1123,6 +1511,10 @@ extern "C" int main(void){
 
 	delay(50);
 
+	// srfRight.setRange(0);
+	// srfLeft.setRange(0);
+	// srfBack.setRange(0);
+
 	pinMode(LED, OUTPUT);
 	pinMode(LASER_SIG, INPUT);
 
@@ -1144,7 +1536,7 @@ extern "C" int main(void){
 	while(1){		
 		kickDog();
 		// save some time here as reading srf08's has seen to dramatically decrease performance
-		switch(loopCount % 5){
+		switch(loopCount % 6){
 			case 0: 
 				if (pixyEnabled){
 					blocks = pixy1.getBlocks();
@@ -1153,13 +1545,16 @@ extern "C" int main(void){
 			case 1: srfBack.getRangeIfCan(backDistance); break;
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
 			case 3: srfLeft.getRangeIfCan(leftDistance); break;
-			case 4:
+			case 4: //srfFront.getRangeIfCan(frontDistance);
+			 break;
+			case 5:
 				getTouch();
 				tftEnableBtn.checkTouch();
 				ltBtn.checkTouch();
 				magBtn.checkTouch();
 				kickBtn.checkTouch();
-				spinBtn.checkTouch();
+				speedBtn.checkTouch();
+				playModeBtn.checkTouch();
 
 				if (tftEnableBtn.released){
 					// toggle display and touch
@@ -1175,45 +1570,155 @@ extern "C" int main(void){
 					calibLight();
 				}
 				else if (kickBtn.released){
+					//avoidMode = !avoidMode;
 					kickMode = !kickMode;
 					if (kickMode){
 						ltBtn.enabled = false;
 						magBtn.enabled = false;
 					}
 				}
-				else if (spinBtn.released){
-					spinMode = !spinMode;
-					kickBtn.enabled = false;
+				else if (speedBtn.released){
+					speedInterface();
+				}
+				else if (playModeBtn.released){
+					playModeBool = !playModeBool;
+					if (playModeBool){
+						playMode = OFFENSE;
+					}
+					else{
+						playMode = DEFENSE;
+					}
 				}
 
 				break;
 		}
 		/* xbee */
-		xbeeTryTxRx();
+		//xbeeTryTxRx();
 		/* end xbee */
 
 		/* orientation/imu */
 		getSlave1Data();
 		/* end orientation/imu */
-
+		frontDistance = 255;
+		switch (linelocation){
+			case LINELOCATION::SIDE_TOP: frontDistance = 10; break;
+			case LINELOCATION::SIDE_BOTTOM: frontDistance = 100; break;
+			case LINELOCATION::CORNER_TOP_LEFT: frontDistance = 10; break;
+			case LINELOCATION::CORNER_TOP_RIGHT: frontDistance = 10; break;
+		}
 		// location
 		if (linelocation == LINELOCATION::UNKNOWN){
 			// we can't tell where we are from line
 			// use ultrasonics
-			if (leftDistance < 35 && rightDistance < 35){
+			if (leftDistance < 40 && rightDistance < 40){
 				linelocation = LINELOCATION::SIDE_TOP;
-				if (backDistance < 35){
+				if (backDistance < 40){
 					linelocation = LINELOCATION::SIDE_BOTTOM;
 				}
+				if (frontDistance < 40){
+					linelocation = LINELOCATION::SIDE_TOP;
+				}
 			}
-			else if (leftDistance < 35){
+			else if (leftDistance < 40){
 				linelocation = LINELOCATION::SIDE_LEFT;
 			}
-			else if (rightDistance < 35){
+			else if (rightDistance < 40){
 				linelocation = LINELOCATION::SIDE_RIGHT;
 			}
 			else{
-				linelocation = LINELOCATION::UNKNOWN;
+				linelocation = LINELOCATION::FIELD;
+			}
+		}
+		else if (linelocation == LINELOCATION::SIDE_LEFT){
+			if (leftDistance > 40 && abs(bearing_int) < 30){
+				linelocation = LINELOCATION::SIDE_RIGHT;
+				if (rightDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+			}
+		}
+		else if (linelocation == LINELOCATION::SIDE_RIGHT){
+			if (rightDistance > 40 && abs(bearing_int) < 30){
+				linelocation = LINELOCATION::SIDE_LEFT;
+				if (leftDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+			}
+		}
+		else if (linelocation == LINELOCATION::SIDE_TOP){
+			if (frontDistance > 40 && abs(bearing_int) < 30){
+				linelocation = LINELOCATION::SIDE_BOTTOM;
+				if (backDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+			}
+		}
+		else if (linelocation == LINELOCATION::SIDE_BOTTOM){
+			if (backDistance > 40){
+				linelocation = LINELOCATION::SIDE_TOP;
+				if (frontDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+			}
+		}
+		else if (linelocation == LINELOCATION::CORNER_BOTTOM_LEFT){
+			if (backDistance > 40 && abs(bearing_int) < 30){
+				if (leftDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+				else{
+					linelocation = LINELOCATION::SIDE_LEFT;
+				}
+			}
+			else{
+				if (leftDistance > 40){
+					linelocation = LINELOCATION::SIDE_BOTTOM;
+				}
+			}
+		}
+		else if (linelocation == LINELOCATION::CORNER_BOTTOM_RIGHT){
+			if (backDistance > 40 && abs(bearing_int) < 30){
+				if (rightDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+				else{
+					linelocation = LINELOCATION::SIDE_RIGHT;
+				}
+			}
+			else{
+				if (rightDistance > 40){
+					linelocation = LINELOCATION::SIDE_TOP;
+				}
+			}
+		}
+		else if (linelocation == LINELOCATION::CORNER_TOP_LEFT){
+			if (leftDistance > 40 && abs(bearing_int) < 30){
+				if (frontDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+				else{
+					linelocation = LINELOCATION::SIDE_TOP;
+				}				
+			}
+			else{
+				if (frontDistance > 40){
+					linelocation = LINELOCATION::SIDE_LEFT;
+				}
+			}
+		}
+		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT){
+			if (rightDistance > 40 && abs(bearing_int) < 30){
+				if (frontDistance > 40){
+					linelocation = LINELOCATION::FIELD;
+				}
+				else{
+					linelocation = LINELOCATION::SIDE_TOP;
+				}
+			}
+			else{
+				if (frontDistance > 40){
+					linelocation = LINELOCATION::SIDE_RIGHT;
+				}
 			}
 		}
 
@@ -1224,36 +1729,36 @@ extern "C" int main(void){
 				dirBoundaries[1] = 180;
 				break;
 			case LINELOCATION::SIDE_LEFT:
-				dirBoundaries[0] = -180;
-				dirBoundaries[1] = 0;
+				dirBoundaries[0] = 0 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = 180 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::SIDE_RIGHT:
-				dirBoundaries[0] = 0;
-				dirBoundaries[1] = 180;
+				dirBoundaries[0] = -180 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = 0 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::CORNER_TOP_LEFT:
-				dirBoundaries[0] = 90;
-				dirBoundaries[1] = 180;
+				dirBoundaries[0] = 90 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = 180 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::CORNER_TOP_RIGHT:
-				dirBoundaries[0] = -180;
-				dirBoundaries[1] = -90;
+				dirBoundaries[0] = -180 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = -90 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::CORNER_BOTTOM_LEFT:
-				dirBoundaries[0] = 0;
-				dirBoundaries[1] = 90;
+				dirBoundaries[0] = 0 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = 90 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::CORNER_BOTTOM_RIGHT:
-				dirBoundaries[0] = -90;
-				dirBoundaries[1] = 90;
+				dirBoundaries[0] = -90 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = 90 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::SIDE_TOP:
-				dirBoundaries[0] = 90;
-				dirBoundaries[1] = -90;
+				dirBoundaries[0] = 90 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = -90 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::SIDE_BOTTOM:
-				dirBoundaries[0] = -90;
-				dirBoundaries[1] = 90;
+				dirBoundaries[0] = -90 + BOUNDARY_OFFSET;
+				dirBoundaries[1] = 90 - BOUNDARY_OFFSET;
 				break;
 			case LINELOCATION::UNKNOWN:
 				dirBoundaries[0] = -180;
@@ -1274,23 +1779,33 @@ extern "C" int main(void){
 		/* end goal detection */
 
 		/* face forwards */
-		if (goalDetected){
-			targetBearing = goalAngle_r_field * 1.3; // always face goals
-		}
-		else if (linelocation == LINELOCATION::SIDE_LEFT){
-			targetBearing = 45;
-		}
-		else if (linelocation == LINELOCATION::SIDE_RIGHT){
-			targetBearing = -45;
-		}
-		else if (linelocation == LINELOCATION::CORNER_TOP_LEFT || linelocation == LINELOCATION::SIDE_TOP){
-			targetBearing = 90;
-		}
-		else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT || linelocation == LINELOCATION::SIDE_BOTTOM){
-			targetBearing = -90;
+		if (playMode == OFFENSE){
+			if (goalDetected){
+				targetBearing = goalAngle_r_field * 1.3; // always face goals
+			}
+			// else if (linelocation == LINELOCATION::SIDE_LEFT){
+			// 	targetBearing = 45;
+			// }
+			// else if (linelocation == LINELOCATION::SIDE_RIGHT){
+			// 	targetBearing = -45;
+			// }
+			// else if (linelocation == LINELOCATION::CORNER_TOP_LEFT || linelocation == LINELOCATION::SIDE_TOP){
+			// 	targetBearing = 90;
+			// }
+			// else if (linelocation == LINELOCATION::CORNER_TOP_RIGHT || linelocation == LINELOCATION::SIDE_BOTTOM){
+			// 	targetBearing = -90;
+			// }
+			else{
+				targetBearing = 0;
+			}
 		}
 		else{
-			targetBearing = 0;
+			if (abs(tsopAngle_r_field) < 40){
+				targetBearing = 0;
+			}
+			else{
+				targetBearing = 0;
+			}
 		}
 		
 		tsopAngle_r_targetBearing = tsopAngle_r_field - targetBearing; // target bearing is relative to field
@@ -1307,10 +1822,15 @@ extern "C" int main(void){
 		checkBallInZone();
 		/* end ball in zone */
 
-		getPlayMode();
-
+		//getPlayMode();
 		/*movement control*/
-		getMovement(playMode);
+		if (tsopStrength > 152 && abs(tsopAngle_r_field) < 30){
+			getMovement(OFFENSE);
+		}
+		else{
+			getMovement(playMode);
+		}
+		
 
 		targetDir = targetDir_r_field - bearing_int;
 		TOBEARING180(targetDir);
@@ -1324,16 +1844,30 @@ extern "C" int main(void){
 		else{
 			kickTime = KICK_TIME;
 		}
-		
-		if (ballInZone && goalDetected && abs(goalAngle) < 10){
-			// GO!
-			targetDir = goalAngle;
-			targetVelocity = SUPER_SPEED;
-			// kick!
-			if (capChargedTime > kickTime){
-				kick();
+		if (playMode == OFFENSE && linelocation == LINELOCATION::FIELD){
+			if (ballInZone && goalDetected && abs(goalAngle) < 10){
+				// GO!
+				targetDir = goalAngle;
+				targetVelocity = superSpeed;
+				// kick!
+				if (capChargedTime > kickTime){
+					kick();
+				}
 			}
 		}
+		else{
+			if (ballInZone){
+				// GO!
+				targetDir = goalAngle;
+				targetVelocity = superSpeed;
+				// kick!
+				if (capChargedTime > kickTime){
+					kick();
+					Serial.println("kick");
+				}
+			}
+		}
+		
 		checkEndKick();
 
 		/* end movement control */
@@ -1341,6 +1875,29 @@ extern "C" int main(void){
 		/* backspin control */
 		getBackspinSpeed();
 		/* end backspin control */
+
+		/* avoid mode */
+		if (avoidMode){
+			int i = 0;
+			int sideV = 0;
+			int forwardV = 0;
+			// if (leftDistance < 45){
+			// 	sideV += 100;
+			// 	i++;
+			// }
+			// if (rightDistance < 45){
+			// 	sideV -= 100;
+			// 	i++;
+			// }
+			if (backDistance < 35){
+				forwardV += 100;
+				i++;
+			}
+			if (i > 0){
+				targetDir = (int16_t)(atan2(sideV, forwardV)*180/PI);
+				targetVelocity = normalSpeed;
+			}
+		}
 
 		if (kickMode){
 			backspinSpeed = 0;
@@ -1370,12 +1927,11 @@ extern "C" int main(void){
 		uint8_t dirByte = (uint8_t)(targetDir * 255/360);
 		Slave3.moveRobot(dirByte, targetVelocity, rotationCorrection);
 		Slave3.moveMotorE(backspinSpeed);
-
-		
+	
 
 		ledBlink();
 		/* debugging */
-		serialDebug();
+		//serialDebug();
 		if (loopCount % 30 == 0){
 			if (tftEnabled){
 				debugTFT();
@@ -1396,18 +1952,32 @@ extern "C" int main(void){
 
 		loopCount++;  // update loop count
 		linelocation_prev = linelocation;
+		Serial.println(linelocation);
+		// if (linelocation != LINELOCATION::FIELD){
+
+		// 	elapsedMicros iloverob = 0;
+		// 	while(iloverob < 50000){
+		// 		kickDog();
+		// 		getSlave1Data();
+		// 		getSlave2Data();
+		// 		bearingPID.update();
+		// 		Slave3.moveRobot(dirByte, targetVelocity, rotationCorrection);
+		// 		Slave3.moveMotorE(backspinSpeed);
+		// 		delay(4);
+		// 	}
+		// }
 	}
 }
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-  void startup_early_hook() {
-    WDOG_TOVALL = (1000); // The next 2 lines sets the time-out value. This is the value that the watchdog timer compare itself to.
-    WDOG_TOVALH = 0;
-    WDOG_STCTRLH = (WDOG_STCTRLH_ALLOWUPDATE | WDOG_STCTRLH_WDOGEN | WDOG_STCTRLH_WAITEN | WDOG_STCTRLH_STOPEN); // Enable WDG
-    //WDOG_PRESC = 0; // prescaler 
-  }
-#ifdef __cplusplus
-}
-#endif
+// #ifdef __cplusplus
+// extern "C" {
+// #endif
+//   void startup_early_hook() {
+//     WDOG_TOVALL = (1000); // The next 2 lines sets the time-out value. This is the value that the watchdog timer compare itself to.
+//     WDOG_TOVALH = 0;
+//     WDOG_STCTRLH = (WDOG_STCTRLH_ALLOWUPDATE | WDOG_STCTRLH_WDOGEN | WDOG_STCTRLH_WAITEN | WDOG_STCTRLH_STOPEN); // Enable WDG
+//     //WDOG_PRESC = 0; // prescaler 
+//   }
+// #ifdef __cplusplus
+// }
+// #endif

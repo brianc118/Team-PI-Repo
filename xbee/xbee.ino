@@ -6,8 +6,9 @@ char c;
 void setup() {
   // put your setup code here, to run once:
   pinMode(led, OUTPUT);
+  delay(1000);
   Serial.begin(9600);
-  Serial3.begin(57600);
+  Serial3.begin(9600);
 }
 
 void loop() {
