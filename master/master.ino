@@ -23,6 +23,10 @@
 #include <DebugUtils.h>
 
 //#define PHASING
+
+// Andrew to disable the front srf again, uncomment the following line (i.e. define FDISABLED)
+//#define FDISABLED
+
 #define DEBUG_SERIAL
  
 #define LED 13
@@ -460,6 +464,9 @@ void getOrbit(bool frontOrbit = false){
 	// get velocity
 	if (linelocation == LINELOCATION::FIELD){
 		
+		// Andrew if decreasing lineSpeed slows down the robot, the following 3 if cases
+		// are the culprit. They are also intended to slow the robot down on the sides and back when getting
+		// close to the wall, but it also works for anything in the way (i.e. other robots)
 		if (leftDistance < 80 && targetDir < -80 && targetDir > -120){
 			targetVelocity = lineSpeed;
 		}
@@ -469,6 +476,11 @@ void getOrbit(bool frontOrbit = false){
 		else if (backDistance < 80 && (targetDir < -150 || targetDir > 150)){
 			targetVelocity = lineSpeed;
 		}
+		// Andrew pay attention to the following statement. Frontdistance is the front srf reading.
+		// Change and tune the threshold of 45 as required. You may also try removing the
+		// && abs(targetDir) < 60 bit, which basically means that it also checks whether
+		// the robot is going to move forward between -60 and 60 degrees. If it's moving backward
+		// it'll still go normal speed.
 		else if (frontDistance < 45 && abs(targetDir) < 60){
 			targetVelocity = lineSpeed;
 		}
@@ -1545,8 +1557,11 @@ extern "C" int main(void){
 			case 1: srfBack.getRangeIfCan(backDistance); break;
 			case 2: srfRight.getRangeIfCan(rightDistance); break;
 			case 3: srfLeft.getRangeIfCan(leftDistance); break;
-			case 4: //srfFront.getRangeIfCan(frontDistance);
-			 break;
+			case 4: 
+#ifdef FDISABLED
+				srfFront.getRangeIfCan(frontDistance);
+#endif
+			 	break;
 			case 5:
 				getTouch();
 				tftEnableBtn.checkTouch();
@@ -1599,6 +1614,7 @@ extern "C" int main(void){
 		/* orientation/imu */
 		getSlave1Data();
 		/* end orientation/imu */
+#ifdef FDISABLED
 		frontDistance = 255;
 		switch (linelocation){
 			case LINELOCATION::SIDE_TOP: frontDistance = 10; break;
@@ -1606,6 +1622,7 @@ extern "C" int main(void){
 			case LINELOCATION::CORNER_TOP_LEFT: frontDistance = 10; break;
 			case LINELOCATION::CORNER_TOP_RIGHT: frontDistance = 10; break;
 		}
+#endif
 		// location
 		if (linelocation == LINELOCATION::UNKNOWN){
 			// we can't tell where we are from line

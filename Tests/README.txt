@@ -1,0 +1,1 @@
+Bunch of "sketches" that were originally in the sketchbook folder, but are unlikely to be useful in the future (I can't quite remember what most of them do)
